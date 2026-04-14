@@ -157,6 +157,9 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       handleScroll: {
         vertTouchDrag: false,
       },
+      handleScale: {
+        pinchScale: true,
+      },
     });
 
     // 캔들 시리즈
@@ -390,7 +393,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
   // → lightweight-charts가 JS로 높이를 조정해도 래퍼 바깥 레이아웃에 영향 없음
   return (
     <div className="relative w-full h-[450px] md:h-[590px]">
-      <div ref={containerRef} className="absolute inset-0" />
+      <div ref={containerRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
       <div
         ref={tooltipRef}
         style={{ display: 'none' }}
