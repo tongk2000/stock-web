@@ -79,6 +79,7 @@ function lineVal(seriesData: Map<ISeriesApi<'Line'>, unknown>, s: ISeriesApi<'Li
 }
 
 export default function CandleChart({ candles, indicators, isDark }: Props) {
+  const wrapperRef      = useRef<HTMLDivElement>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
   const tooltipRef      = useRef<HTMLDivElement>(null);
   // 스테일 클로저 없이 툴팁 on/off를 crosshairMove 콜백에서 읽기 위한 ref
@@ -113,7 +114,8 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
   // MA·BB 변경은 이 effect를 트리거하지 않음 → 높이 불변
 
   useEffect(() => {
-    if (!containerRef.current || candles.length === 0) return;
+    if (!containerRef.current || !wrapperRef.current || candles.length === 0) return;
+    const wrapper = wrapperRef.current;
 
     const theme = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
 
@@ -243,19 +245,34 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     if (indicators.rsi)    { chart.panes()[pi++].setHeight(rsiH); }
     if (indicators.obv)    { chart.panes()[pi++].setHeight(obvH); }
 
-    // 보조지표 패널 좌상단 legend div 생성
-    const mkLegend = (paneEl: HTMLElement | null): HTMLDivElement | null => {
-      if (!paneEl) return null;
-      paneEl.style.position = 'relative'; // absolute 자식의 기준점 확보
+    // 보조지표 패널 좌상단 legend div — 래퍼 div에 직접 붙여 pane DOM 의존성 제거
+    const mkLegend = (topY: number): HTMLDivElement => {
       const d = document.createElement('div');
-      d.style.cssText = `position:absolute;top:4px;left:4px;z-index:100;font-size:11px;color:${theme.text};opacity:0.8;pointer-events:none;white-space:nowrap;`;
-      paneEl.appendChild(d);
+      d.style.cssText = `position:absolute;top:${topY + 4}px;left:4px;z-index:20;font-size:11px;color:${theme.text};opacity:0.8;pointer-events:none;white-space:nowrap;`;
+      wrapper.appendChild(d);
       return d;
     };
-    let li = 1;
-    legendsRef.current.vol = indicators.volume ? mkLegend(chart.panes()[li++]?.getHTMLElement() ?? null) : null;
-    legendsRef.current.rsi = indicators.rsi    ? mkLegend(chart.panes()[li++]?.getHTMLElement() ?? null) : null;
-    legendsRef.current.obv = indicators.obv    ? mkLegend(chart.panes()[li++]?.getHTMLElement() ?? null) : null;
+    legendsRef.current.vol = indicators.volume ? mkLegend(priceH)                 : null;
+    legendsRef.current.rsi = indicators.rsi    ? mkLegend(priceH + volH)          : null;
+    legendsRef.current.obv = indicators.obv    ? mkLegend(priceH + volH + rsiH)   : null;
+
+    // 패널 드래그 / 리사이즈 후 legend top 위치 재계산
+    const repositionLegends = () => {
+      const panes = chart.panes();
+      let cumY = panes[0].getHeight();
+      let pi = 1;
+      if (legendsRef.current.vol) {
+        legendsRef.current.vol.style.top = `${cumY + 4}px`;
+        cumY += panes[pi++]?.getHeight() ?? 0;
+      }
+      if (legendsRef.current.rsi) {
+        legendsRef.current.rsi.style.top = `${cumY + 4}px`;
+        cumY += panes[pi++]?.getHeight() ?? 0;
+      }
+      if (legendsRef.current.obv) {
+        legendsRef.current.obv.style.top = `${cumY + 4}px`;
+      }
+    };
 
     if (candles.length > 60) {
       chart.timeScale().setVisibleLogicalRange({
@@ -359,10 +376,11 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     // ResizeObserver
     const ro = new ResizeObserver(() => {
       if (containerRef.current) {
-        chart.applyOptions({ 
+        chart.applyOptions({
           width: containerRef.current.clientWidth,
           height: containerRef.current.clientHeight
         });
+        repositionLegends();
       }
     });
     ro.observe(containerRef.current);
@@ -447,6 +465,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       panes[sepIdx].setHeight(Math.max(50, baseH[sepIdx] + delta));
       if (sepIdx + 1 < panes.length)
         panes[sepIdx + 1].setHeight(Math.max(50, baseH[sepIdx + 1] - delta));
+      repositionLegends();
     };
 
     const onSepEnd = (e: TouchEvent) => {
@@ -545,7 +564,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
   }, [candles, isDark, indicators.volume, indicators.rsi, indicators.obv, maKey, indicators.bb]);
 
   return (
-    <div className="relative w-full h-[450px] md:h-[590px]">
+    <div ref={wrapperRef} className="relative w-full h-[450px] md:h-[590px]">
       <div ref={containerRef} className="absolute inset-0" style={{ touchAction: 'pan-y' }} />
       <div
         ref={tooltipRef}
