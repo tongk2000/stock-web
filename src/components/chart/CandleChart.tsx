@@ -238,82 +238,64 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       chart.timeScale().fitContent();
     }
 
-    // 크로스헤어 툴팁 (overlayRef를 실시간으로 읽음)
+    // 크로스헤어 → 차트 위 정보 바 업데이트 (플로팅 툴팁 대신 고정 바 사용)
     // setCrosshairPosition 호출이 다시 콜백을 트리거하지 않도록 재진입 방지
     let settingCrosshair = false;
     chart.subscribeCrosshairMove((param) => {
       if (settingCrosshair) return;
-      const tooltip = tooltipRef.current, container = containerRef.current;
-      if (!tooltip || !container) return;
-      if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
-        tooltip.style.display = 'none'; return;
-      }
+      const infoBar = tooltipRef.current;
+      if (!infoBar) return;
+      if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) return;
+
       const candle = candleMap.get(param.time as string);
       const ohlc   = param.seriesData.get(candleSeries) as CandlestickData | undefined;
-      if (!candle || !ohlc) { tooltip.style.display = 'none'; return; }
+      if (!candle || !ohlc) return;
 
       const isUp = candle.close >= candle.open;
       const up = '#ef4444', dn = '#3b82f6', cl = isUp ? up : dn;
       const chg = candle.close - candle.open;
       const pct = ((chg / candle.open) * 100).toFixed(2);
 
-      let rows = `
-        <div style="display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:12px;line-height:1.6">
-          <span style="opacity:0.55">시가</span><span>${fmt(candle.open)}</span>
-          <span style="opacity:0.55">고가</span><span style="color:${up}">${fmt(candle.high)}</span>
-          <span style="opacity:0.55">저가</span><span style="color:${dn}">${fmt(candle.low)}</span>
-          <span style="opacity:0.55">종가</span><span style="color:${cl};font-weight:600">${fmt(candle.close)}</span>
-          <span style="opacity:0.55">등락</span><span style="color:${cl}">${isUp ? '+' : ''}${fmt(chg)} (${isUp ? '+' : ''}${pct}%)</span>
-          <span style="opacity:0.55">거래량</span><span>${fmt(candle.volume)}</span>
+      // ── Row 1: 날짜 + OHLCV ──────────────────────────────────────────────────
+      const ohlcRow = `
+        <div style="display:flex;flex-wrap:wrap;align-items:baseline;column-gap:9px;row-gap:0;font-size:11px;line-height:1.7">
+          <span style="opacity:0.4;font-size:10px">${candle.date}</span>
+          <span><span style="opacity:0.45;font-size:10px">시</span>&thinsp;${fmt(candle.open)}</span>
+          <span><span style="opacity:0.45;font-size:10px">고</span>&thinsp;<span style="color:${up}">${fmt(candle.high)}</span></span>
+          <span><span style="opacity:0.45;font-size:10px">저</span>&thinsp;<span style="color:${dn}">${fmt(candle.low)}</span></span>
+          <span><span style="opacity:0.45;font-size:10px">종</span>&thinsp;<span style="color:${cl};font-weight:600">${fmt(candle.close)}</span></span>
+          <span style="color:${cl}">${isUp ? '+' : ''}${fmt(chg)}&thinsp;(${isUp ? '+' : ''}${pct}%)</span>
+          <span style="opacity:0.35;font-size:10px">${fmtObv(candle.volume)}</span>
         </div>`;
 
-      // 이평선 (단기→장기)
+      // ── Row 2: 지표값 (활성화된 것만) ─────────────────────────────────────────
       const sd = param.seriesData as Map<ISeriesApi<'Line'>, unknown>;
-      const maRows = [...overlayRef.current.ma]
-        .sort((a, b) => a.period - b.period)
-        .map(({ period, s }) => {
-          const v = lineVal(sd, s);
-          return v !== null ? `<span style="opacity:0.55;color:${MA_SOLID[period]}">MA${period}</span><span>${fmt(Math.round(v))}</span>` : '';
-        }).filter(Boolean);
+      const items: string[] = [];
 
-      // 볼린저밴드
-      const bbRows: string[] = [];
-      const { bbUpper, bbMid, bbLower } = overlayRef.current;
-      if (bbUpper) { const v = lineVal(sd, bbUpper); if (v !== null) bbRows.push(`<span style="opacity:0.55;color:#818cf8">BB상</span><span>${fmt(Math.round(v))}</span>`); }
-      if (bbMid)   { const v = lineVal(sd, bbMid);   if (v !== null) bbRows.push(`<span style="opacity:0.55;color:#6366f1">BB중</span><span>${fmt(Math.round(v))}</span>`); }
-      if (bbLower) { const v = lineVal(sd, bbLower);  if (v !== null) bbRows.push(`<span style="opacity:0.55;color:#818cf8">BB하</span><span>${fmt(Math.round(v))}</span>`); }
-
-      const indicatorRows = [...maRows, ...bbRows];
-      if (indicatorRows.length > 0) {
-        rows += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(128,128,128,0.2);display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:12px;line-height:1.6">${indicatorRows.join('')}</div>`;
+      for (const { period, s } of [...overlayRef.current.ma].sort((a, b) => a.period - b.period)) {
+        const v = lineVal(sd, s);
+        if (v !== null) items.push(`<span style="color:${MA_SOLID[period]};font-size:10px">MA${period}</span>&thinsp;${fmt(Math.round(v))}`);
       }
+      const { bbUpper, bbMid, bbLower } = overlayRef.current;
+      if (bbUpper) { const v = lineVal(sd, bbUpper); if (v !== null) items.push(`<span style="color:#818cf8;font-size:10px">BB상</span>&thinsp;${fmt(Math.round(v))}`); }
+      if (bbMid)   { const v = lineVal(sd, bbMid);   if (v !== null) items.push(`<span style="color:#6366f1;font-size:10px">BB중</span>&thinsp;${fmt(Math.round(v))}`); }
+      if (bbLower) { const v = lineVal(sd, bbLower);  if (v !== null) items.push(`<span style="color:#818cf8;font-size:10px">BB하</span>&thinsp;${fmt(Math.round(v))}`); }
       if (rsiS) {
         const v = lineVal(sd, rsiS);
         if (v !== null) {
           const rc = v >= 70 ? up : v <= 30 ? dn : '#a78bfa';
-          rows += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(128,128,128,0.2);display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:12px;line-height:1.6"><span style="opacity:0.55;color:#a78bfa">RSI</span><span style="color:${rc};font-weight:600">${v.toFixed(2)}</span></div>`;
+          items.push(`<span style="color:#a78bfa;font-size:10px">RSI</span>&thinsp;<span style="color:${rc};font-weight:600">${v.toFixed(2)}</span>`);
         }
       }
       if (obvS) {
         const v = lineVal(sd, obvS);
-        if (v !== null) {
-          rows += `<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(128,128,128,0.2);display:grid;grid-template-columns:auto auto;gap:2px 14px;font-size:12px;line-height:1.6"><span style="opacity:0.55;color:#34d399">OBV</span><span style="color:#34d399">${fmtObv(v)}</span></div>`;
-        }
+        if (v !== null) items.push(`<span style="color:#34d399;font-size:10px">OBV</span>&thinsp;<span style="color:#34d399">${fmtObv(v)}</span>`);
       }
+      const indRow = items.length > 0
+        ? `<div style="display:flex;flex-wrap:wrap;column-gap:9px;font-size:11px;line-height:1.6;margin-top:1px">${items.join('')}</div>`
+        : '';
 
-      tooltip.innerHTML = `<div style="margin-bottom:5px;font-size:11px;opacity:0.5;font-weight:500">${candle.date}</div>${rows}`;
-      tooltip.style.display = 'block';
-      const cw = container.clientWidth, ch = container.clientHeight;
-      const tw = tooltip.offsetWidth || 160, th = tooltip.offsetHeight || 120;
-      // 좌우: 오른쪽에 공간 없으면 왼쪽으로
-      const left = param.point.x + 16 + tw > cw
-        ? param.point.x - tw - 16
-        : param.point.x + 16;
-      // 상하: 아래로 잘리면 커서 위로 올림
-      let top = param.point.y - 40;
-      if (top + th > ch) top = param.point.y - th - 10;
-      tooltip.style.left = `${Math.max(4, left)}px`;
-      tooltip.style.top  = `${Math.max(4, top)}px`;
+      infoBar.innerHTML = ohlcRow + indRow;
 
       // 가로 크로스헤어를 항상 종가에 고정 (MA·BB 선에 끌려가는 현상 방지)
       settingCrosshair = true;
@@ -506,17 +488,18 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [candles, isDark, indicators.volume, indicators.rsi, indicators.obv, maKey, indicators.bb]);
 
-  // 외부 래퍼: CSS 고정 높이로 페이지 레이아웃을 anchor
-  // 내부 containerRef: absolute inset-0 으로 래퍼를 채움
-  // → lightweight-charts가 JS로 높이를 조정해도 래퍼 바깥 레이아웃에 영향 없음
+  // 정보 바: 차트 위 고정 — 크로스헤어 이동 시 OHLCV·지표값을 여기에 표시
+  // 차트를 전혀 가리지 않으며, min-h 로 공간을 항상 확보해 레이아웃 흔들림 없음
   return (
-    <div className="relative w-full h-[450px] md:h-[590px]">
-      <div ref={containerRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
+    <div className="w-full">
       <div
         ref={tooltipRef}
-        style={{ display: 'none' }}
-        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/30 px-3 py-2.5 text-foreground shadow-lg backdrop-blur-sm"
+        className="pointer-events-none min-h-[38px] w-full overflow-hidden px-2 py-1 text-foreground"
       />
+      {/* 차트 래퍼: CSS 고정 높이로 페이지 레이아웃을 anchor */}
+      <div className="relative h-[450px] md:h-[590px]">
+        <div ref={containerRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
+      </div>
     </div>
   );
 }
