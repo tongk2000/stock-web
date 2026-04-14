@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import QueryProvider from "@/components/layout/query-provider";
 import { LeftNav } from "@/components/layout/LeftNav";
 import { ThemeProvider } from "@/components/theme-provider";
+import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -38,10 +39,12 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex">
         <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-          <LeftNav />
-          <div className="flex-1 flex flex-col min-w-0">
-            <QueryProvider>{children}</QueryProvider>
-          </div>
+          <FavoritesProvider>
+            <LeftNav />
+            <div className="flex-1 flex flex-col min-w-0">
+              <QueryProvider>{children}</QueryProvider>
+            </div>
+          </FavoritesProvider>
         </ThemeProvider>
       </body>
     </html>
