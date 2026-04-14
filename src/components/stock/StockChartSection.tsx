@@ -40,6 +40,7 @@ const DEFAULT_INDICATORS: IndicatorOptions = {
   bb: false,
   rsi: false,
   obv: false,
+  tooltip: true,
 };
 
 function loadIndicators(): IndicatorOptions {
@@ -305,6 +306,10 @@ export default function StockChartSection({ code }: Props) {
                   <div className="mx-1 h-3 w-px bg-border/60" />
                   <ToggleBtn active={indicators.bb} onClick={() => toggleFlag('bb')} accentColor="#6366f1">
                     BB
+                  </ToggleBtn>
+                  <div className="mx-1 h-3 w-px bg-border/60" />
+                  <ToggleBtn active={indicators.tooltip} onClick={() => toggleFlag('tooltip')}>
+                    툴팁
                   </ToggleBtn>
                 </div>
               </div>

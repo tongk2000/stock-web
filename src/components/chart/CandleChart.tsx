@@ -22,6 +22,7 @@ export interface IndicatorOptions {
   bb: boolean;
   rsi: boolean;
   obv: boolean;
+  tooltip: boolean;
 }
 
 interface Props {
@@ -78,8 +79,18 @@ function lineVal(seriesData: Map<ISeriesApi<'Line'>, unknown>, s: ISeriesApi<'Li
 }
 
 export default function CandleChart({ candles, indicators, isDark }: Props) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const tooltipRef   = useRef<HTMLDivElement>(null);
+  const containerRef    = useRef<HTMLDivElement>(null);
+  const tooltipRef      = useRef<HTMLDivElement>(null);
+  // 스테일 클로저 없이 툴팁 on/off를 crosshairMove 콜백에서 읽기 위한 ref
+  const showTooltipRef  = useRef(indicators.tooltip);
+
+  // indicators.tooltip 변경 시 ref 동기화 + 즉시 숨김 처리
+  useEffect(() => {
+    showTooltipRef.current = indicators.tooltip;
+    if (!indicators.tooltip && tooltipRef.current) {
+      tooltipRef.current.style.display = 'none';
+    }
+  }, [indicators.tooltip]);
 
   // 차트 인스턴스 + 시리즈 ref (effect 간 공유)
   const chartRef        = useRef<IChartApi | null>(null);
@@ -245,6 +256,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       if (settingCrosshair) return;
       const tooltip = tooltipRef.current, container = containerRef.current;
       if (!tooltip || !container) return;
+      if (!showTooltipRef.current) { tooltip.style.display = 'none'; return; }
       if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
         tooltip.style.display = 'none'; return;
       }
@@ -511,7 +523,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       <div
         ref={tooltipRef}
         style={{ display: 'none' }}
-        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/80 px-2.5 py-2 text-foreground shadow-md backdrop-blur-sm"
+        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/30 px-2.5 py-2 text-foreground shadow-md backdrop-blur-sm"
       />
     </div>
   );
