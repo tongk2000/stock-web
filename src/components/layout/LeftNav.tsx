@@ -2,9 +2,10 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, TrendingUp, MessageSquare, Menu, X } from 'lucide-react';
+import { Home, TrendingUp, MessageSquare, Menu, X, Monitor, Sun, Moon } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/components/theme-provider';
 
 const navItems = [
   { href: '/', label: '홈', icon: Home },
@@ -12,16 +13,23 @@ const navItems = [
   { href: '/discussions', label: '토론방', icon: MessageSquare },
 ];
 
+const themeOptions = [
+  { value: 'system' as const, label: '시스템', icon: Monitor },
+  { value: 'light' as const, label: '라이트', icon: Sun },
+  { value: 'dark' as const, label: '다크', icon: Moon },
+];
+
 export function LeftNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const { theme, setTheme } = useTheme();
 
   return (
     <>
       {/* 모바일 햄버거 버튼 */}
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed top-4 left-4 z-50 sm:hidden flex h-10 w-10 items-center justify-center rounded-full bg-sidebar text-sidebar-foreground shadow-lg border border-sidebar-border"
+        className="fixed top-4 left-4 z-50 sm:hidden flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
         aria-label="메뉴 열기"
       >
         <Menu className="size-5" />
@@ -86,6 +94,29 @@ export function LeftNav() {
             );
           })}
         </nav>
+
+        {/* 하단 테마 설정 */}
+        <div className="p-3 border-t border-sidebar-border shrink-0">
+          <p className="text-xs text-sidebar-foreground/50 px-1 mb-2">테마</p>
+          <div className="flex gap-1">
+            {themeOptions.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => setTheme(value)}
+                className={cn(
+                  'flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs font-medium transition-colors',
+                  theme === value
+                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                )}
+                aria-label={`${label} 테마`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </aside>
     </>
   );
