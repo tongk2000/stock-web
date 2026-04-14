@@ -2,6 +2,7 @@
 
 import {
   createChart,
+  CrosshairMode,
   CandlestickSeries,
   LineSeries,
   HistogramSeries,
@@ -155,6 +156,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       grid: { vertLines: { color: theme.grid }, horzLines: { color: theme.grid } },
       rightPriceScale: { borderColor: theme.border },
       timeScale: { borderColor: theme.border, fixLeftEdge: true, fixRightEdge: true },
+      crosshair: { mode: CrosshairMode.Magnet },
       handleScroll: {
         vertTouchDrag: false,
       },
@@ -505,7 +507,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       <div
         ref={tooltipRef}
         style={{ display: 'none' }}
-        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/95 px-3 py-2.5 text-foreground shadow-lg backdrop-blur-sm"
+        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/50 px-3 py-2.5 text-foreground shadow-lg backdrop-blur-sm"
       />
     </div>
   );
