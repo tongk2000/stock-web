@@ -521,7 +521,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
 
   return (
     <div className="relative w-full h-[450px] md:h-[590px]">
-      <div ref={containerRef} className="absolute inset-0" style={{ touchAction: 'none' }} />
+      <div ref={containerRef} className="absolute inset-0" style={{ touchAction: 'pan-y' }} />
       <div
         ref={tooltipRef}
         style={{ display: 'none' }}
