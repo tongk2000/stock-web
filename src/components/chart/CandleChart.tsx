@@ -101,6 +101,9 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     bbMid:   ISeriesApi<'Line'> | null;
     bbLower: ISeriesApi<'Line'> | null;
   }>({ ma: [], bbUpper: null, bbMid: null, bbLower: null });
+  // 각 보조지표 패널 좌상단 legend div
+  const legendsRef = useRef<{ vol: HTMLDivElement | null; rsi: HTMLDivElement | null; obv: HTMLDivElement | null }>
+    ({ vol: null, rsi: null, obv: null });
 
   // MA 배열을 stable 문자열로 변환 (effect dep용)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -240,6 +243,19 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     if (indicators.rsi)    { chart.panes()[pi++].setHeight(rsiH); }
     if (indicators.obv)    { chart.panes()[pi++].setHeight(obvH); }
 
+    // 보조지표 패널 좌상단 legend div 생성
+    const mkLegend = (paneEl: HTMLElement | null): HTMLDivElement | null => {
+      if (!paneEl) return null;
+      const d = document.createElement('div');
+      d.style.cssText = `position:absolute;top:4px;left:4px;z-index:10;font-size:11px;color:${theme.text};opacity:0.75;pointer-events:none;white-space:nowrap;`;
+      paneEl.appendChild(d);
+      return d;
+    };
+    let li = 1;
+    legendsRef.current.vol = indicators.volume ? mkLegend(chart.panes()[li++]?.getHTMLElement() ?? null) : null;
+    legendsRef.current.rsi = indicators.rsi    ? mkLegend(chart.panes()[li++]?.getHTMLElement() ?? null) : null;
+    legendsRef.current.obv = indicators.obv    ? mkLegend(chart.panes()[li++]?.getHTMLElement() ?? null) : null;
+
     if (candles.length > 60) {
       chart.timeScale().setVisibleLogicalRange({
         from: candles.length - 60,
@@ -268,6 +284,23 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
       settingCrosshair = false;
 
+      // ── 보조지표 패널 legend 업데이트 (항상 실행) ─────────────────────────────
+      const sd = param.seriesData as Map<ISeriesApi<'Line'>, unknown>;
+      if (legendsRef.current.vol) {
+        legendsRef.current.vol.textContent = `거래량 ${fmt(candle.volume)}`;
+      }
+      if (rsiS && legendsRef.current.rsi) {
+        const v = lineVal(sd, rsiS);
+        if (v !== null) {
+          const rc = v >= 70 ? '#ef4444' : v <= 30 ? '#3b82f6' : '#a78bfa';
+          legendsRef.current.rsi.innerHTML = `RSI&nbsp;<span style="color:${rc};font-weight:600">${v.toFixed(2)}</span>`;
+        }
+      }
+      if (obvS && legendsRef.current.obv) {
+        const v = lineVal(sd, obvS);
+        if (v !== null) legendsRef.current.obv.textContent = `OBV ${fmtObv(v)}`;
+      }
+
       // tooltip이 꺼져 있으면 여기서 종료
       if (!showTooltipRef.current) { tooltip.style.display = 'none'; return; }
 
@@ -276,7 +309,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       const chg = candle.close - candle.open;
       const pct = ((chg / candle.open) * 100).toFixed(2);
 
-      // ── OHLCV ────────────────────────────────────────────────────────────────
+      // ── OHLCV (툴팁) ─────────────────────────────────────────────────────────
       let html = `
         <div style="font-size:10px;opacity:0.45;margin-bottom:4px;letter-spacing:0.02em">${candle.date}</div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;line-height:1.6">
@@ -290,8 +323,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
           <span style="opacity:0.35;font-size:10px">${fmtObv(candle.volume)}</span>
         </div>`;
 
-      // ── 지표값 ────────────────────────────────────────────────────────────────
-      const sd = param.seriesData as Map<ISeriesApi<'Line'>, unknown>;
+      // ── MA·BB만 툴팁에 표시 (RSI·OBV·거래량은 각 패널 legend로 이동) ──────────
       const indItems: string[] = [];
       for (const { period, s } of [...overlayRef.current.ma].sort((a, b) => a.period - b.period)) {
         const v = lineVal(sd, s);
@@ -301,17 +333,6 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       if (bbUpper) { const v = lineVal(sd, bbUpper); if (v !== null) indItems.push(`<div><span style="color:#818cf8;font-size:10px">BB상&nbsp;</span>${fmt(Math.round(v))}</div>`); }
       if (bbMid)   { const v = lineVal(sd, bbMid);   if (v !== null) indItems.push(`<div><span style="color:#6366f1;font-size:10px">BB중&nbsp;</span>${fmt(Math.round(v))}</div>`); }
       if (bbLower) { const v = lineVal(sd, bbLower);  if (v !== null) indItems.push(`<div><span style="color:#818cf8;font-size:10px">BB하&nbsp;</span>${fmt(Math.round(v))}</div>`); }
-      if (rsiS) {
-        const v = lineVal(sd, rsiS);
-        if (v !== null) {
-          const rc = v >= 70 ? up : v <= 30 ? dn : '#a78bfa';
-          indItems.push(`<div><span style="color:#a78bfa;font-size:10px">RSI&nbsp;</span><span style="color:${rc};font-weight:600">${v.toFixed(2)}</span></div>`);
-        }
-      }
-      if (obvS) {
-        const v = lineVal(sd, obvS);
-        if (v !== null) indItems.push(`<div><span style="color:#34d399;font-size:10px">OBV&nbsp;</span><span style="color:#34d399">${fmtObv(v)}</span></div>`);
-      }
       if (indItems.length > 0) {
         html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.15);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;line-height:1.6">${indItems.join('')}</div>`;
       }
@@ -459,6 +480,9 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       el.removeEventListener('touchmove',  onSepMove);
       el.removeEventListener('touchend',   onSepEnd);
       if (lpTimer) clearTimeout(lpTimer);
+      // 패널 legend 제거
+      [legendsRef.current.vol, legendsRef.current.rsi, legendsRef.current.obv].forEach(el => el?.remove());
+      legendsRef.current = { vol: null, rsi: null, obv: null };
       // 서브 패널 높이만 저장 (가격 패널은 항상 나머지로 계산)
       let si = 1;
       if (indicators.volume) savePaneH(PANE_KEYS.vol, chart.panes()[si++].getHeight());
