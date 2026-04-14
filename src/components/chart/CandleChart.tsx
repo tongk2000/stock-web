@@ -246,8 +246,9 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     // 보조지표 패널 좌상단 legend div 생성
     const mkLegend = (paneEl: HTMLElement | null): HTMLDivElement | null => {
       if (!paneEl) return null;
+      paneEl.style.position = 'relative'; // absolute 자식의 기준점 확보
       const d = document.createElement('div');
-      d.style.cssText = `position:absolute;top:4px;left:4px;z-index:10;font-size:11px;color:${theme.text};opacity:0.75;pointer-events:none;white-space:nowrap;`;
+      d.style.cssText = `position:absolute;top:4px;left:4px;z-index:100;font-size:11px;color:${theme.text};opacity:0.8;pointer-events:none;white-space:nowrap;`;
       paneEl.appendChild(d);
       return d;
     };
