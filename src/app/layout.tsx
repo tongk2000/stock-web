@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import QueryProvider from "@/components/layout/query-provider";
+import { LeftNav } from "@/components/layout/LeftNav";
 import { ThemeProvider } from "@/components/theme-provider";
-import { ThemeToggle } from "@/components/theme-toggle";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -36,10 +36,12 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: scriptStr }} />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex">
         <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
-          <QueryProvider>{children}</QueryProvider>
-          <ThemeToggle />
+          <LeftNav />
+          <div className="flex-1 flex flex-col min-w-0">
+            <QueryProvider>{children}</QueryProvider>
+          </div>
         </ThemeProvider>
       </body>
     </html>
