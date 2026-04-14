@@ -139,6 +139,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
         panes: {
           separatorColor: theme.border,
           separatorHoverColor: theme.border,
+          enableResize: !isMobile, // 모바일: 커스텀 롱프레스 드래그로 대체
         },
       } as any,
       localization: {
@@ -156,9 +157,6 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       timeScale: { borderColor: theme.border, fixLeftEdge: true, fixRightEdge: true },
       handleScroll: {
         vertTouchDrag: false,
-      },
-      handleScale: {
-        pinchScale: true,
       },
     });
 
@@ -324,14 +322,109 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     });
     ro.observe(containerRef.current);
 
-    // 모바일 사파리에서 핀치 제스처를 브라우저가 가로채지 않도록 처리
-    // passive: false → preventDefault() 호출 가능, 빠른 핀치에도 브라우저 기본 동작 차단
+    // ── 모바일 터치 핸들러 ────────────────────────────────────────────────────────
     const el = containerRef.current;
+
+    // (A) 핀치 제스처를 사파리가 가로채지 않도록 차단 (passive:false 필수)
     const blockPinch = (e: TouchEvent) => {
       if (e.touches.length >= 2) e.preventDefault();
     };
-    el.addEventListener('touchstart', blockPinch, { passive: false });
-    el.addEventListener('touchmove',  blockPinch, { passive: false });
+
+    // (B) 구분선 롱프레스 드래그
+    //     enableResize:false 로 기본 드래그 비활성화 → 한 손가락 500ms 유지 시에만 이동
+    const SEP_HIT  = 16; // 히트 영역 px
+    const LP_MS    = 500; // 롱프레스 판정 ms
+    const MOVE_THR = 8;  // 이 이상 움직이면 롱프레스 취소 px
+
+    let sepState: 'idle' | 'detecting' | 'dragging' = 'idle';
+    let lpTimer: ReturnType<typeof setTimeout> | null = null;
+    let sepIdx = -1;
+    let sepTid = -1;   // touch identifier
+    let sepY0  = 0;
+    let baseH: number[] = [];
+
+    const getSepYs = (): number[] => {
+      const ys: number[] = [];
+      let y = 0;
+      for (const p of chart.panes().slice(0, -1)) { y += p.getHeight(); ys.push(y); }
+      return ys;
+    };
+
+    const onSepStart = (e: TouchEvent) => {
+      // 멀티터치 진입 시 롱프레스 취소
+      if (e.touches.length >= 2) {
+        if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+        sepState = 'idle'; sepIdx = -1;
+        return;
+      }
+      if (e.touches.length !== 1 || sepState !== 'idle') return;
+
+      const t = e.touches[0];
+      const rect = el.getBoundingClientRect();
+      const y = t.clientY - rect.top;
+      const idx = getSepYs().findIndex(sy => Math.abs(y - sy) < SEP_HIT);
+      if (idx === -1) return;
+
+      e.preventDefault(); // 구분선 근처는 스크롤 차단 후 롱프레스 판정
+      sepState = 'detecting';
+      sepIdx   = idx;
+      sepY0    = y;
+      sepTid   = t.identifier;
+
+      lpTimer = setTimeout(() => {
+        if (sepState === 'detecting') {
+          sepState = 'dragging';
+          baseH = chart.panes().map(p => p.getHeight());
+        }
+      }, LP_MS);
+    };
+
+    const onSepMove = (e: TouchEvent) => {
+      if (sepState === 'idle') return;
+      const t = Array.from(e.touches).find(x => x.identifier === sepTid);
+      if (!t) return;
+
+      const rect = el.getBoundingClientRect();
+      const y = t.clientY - rect.top;
+
+      if (sepState === 'detecting') {
+        if (Math.abs(y - sepY0) > MOVE_THR) {
+          if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+          sepState = 'idle';
+        }
+        return;
+      }
+
+      // dragging
+      e.preventDefault();
+      const delta = y - sepY0;
+      const panes = chart.panes();
+      panes[sepIdx].setHeight(Math.max(50, baseH[sepIdx] + delta));
+      if (sepIdx + 1 < panes.length)
+        panes[sepIdx + 1].setHeight(Math.max(50, baseH[sepIdx + 1] - delta));
+    };
+
+    const onSepEnd = (e: TouchEvent) => {
+      if (sepState === 'idle') return;
+      if (Array.from(e.touches).some(x => x.identifier === sepTid)) return;
+
+      if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
+
+      if (sepState === 'dragging') {
+        const panes = chart.panes();
+        let pi = 1;
+        if (indicators.volume) savePaneH(PANE_KEYS.vol, panes[pi++].getHeight());
+        if (indicators.rsi)    savePaneH(PANE_KEYS.rsi, panes[pi++].getHeight());
+        if (indicators.obv)    savePaneH(PANE_KEYS.obv, panes[pi++].getHeight());
+      }
+      sepState = 'idle'; sepIdx = -1;
+    };
+
+    el.addEventListener('touchstart', blockPinch,  { passive: false });
+    el.addEventListener('touchmove',  blockPinch,  { passive: false });
+    el.addEventListener('touchstart', onSepStart,  { passive: false });
+    el.addEventListener('touchmove',  onSepMove,   { passive: false });
+    el.addEventListener('touchend',   onSepEnd);
 
     chartRef.current        = chart;
     candleSeriesRef.current = candleSeries;
@@ -339,6 +432,10 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     return () => {
       el.removeEventListener('touchstart', blockPinch);
       el.removeEventListener('touchmove',  blockPinch);
+      el.removeEventListener('touchstart', onSepStart);
+      el.removeEventListener('touchmove',  onSepMove);
+      el.removeEventListener('touchend',   onSepEnd);
+      if (lpTimer) clearTimeout(lpTimer);
       // 서브 패널 높이만 저장 (가격 패널은 항상 나머지로 계산)
       let si = 1;
       if (indicators.volume) savePaneH(PANE_KEYS.vol, chart.panes()[si++].getHeight());
