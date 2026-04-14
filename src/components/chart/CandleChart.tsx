@@ -256,13 +256,20 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       if (settingCrosshair) return;
       const tooltip = tooltipRef.current, container = containerRef.current;
       if (!tooltip || !container) return;
-      if (!showTooltipRef.current) { tooltip.style.display = 'none'; return; }
       if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
         tooltip.style.display = 'none'; return;
       }
       const candle = candleMap.get(param.time as string);
       const ohlc   = param.seriesData.get(candleSeries) as CandlestickData | undefined;
       if (!candle || !ohlc) { tooltip.style.display = 'none'; return; }
+
+      // 가로 크로스헤어를 항상 종가에 고정 — tooltip on/off와 무관하게 항상 실행
+      settingCrosshair = true;
+      chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
+      settingCrosshair = false;
+
+      // tooltip이 꺼져 있으면 여기서 종료
+      if (!showTooltipRef.current) { tooltip.style.display = 'none'; return; }
 
       const isUp = candle.close >= candle.open;
       const up = '#ef4444', dn = '#3b82f6', cl = isUp ? up : dn;
@@ -271,14 +278,16 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
 
       // ── OHLCV ────────────────────────────────────────────────────────────────
       let html = `
-        <div style="font-size:10px;opacity:0.4;margin-bottom:3px">${candle.date}</div>
-        <div style="display:grid;grid-template-columns:auto auto;gap:1px 10px;font-size:11px;line-height:1.55">
-          <span style="opacity:0.5">시</span><span>${fmt(candle.open)}</span>
-          <span style="opacity:0.5">고</span><span style="color:${up}">${fmt(candle.high)}</span>
-          <span style="opacity:0.5">저</span><span style="color:${dn}">${fmt(candle.low)}</span>
-          <span style="opacity:0.5">종</span><span style="color:${cl};font-weight:600">${fmt(candle.close)}</span>
-          <span style="opacity:0.5">등락</span><span style="color:${cl}">${isUp ? '+' : ''}${fmt(chg)}&thinsp;(${isUp ? '+' : ''}${pct}%)</span>
-          <span style="opacity:0.5">거래량</span><span>${fmtObv(candle.volume)}</span>
+        <div style="font-size:10px;opacity:0.45;margin-bottom:4px;letter-spacing:0.02em">${candle.date}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;line-height:1.6">
+          <div><span style="opacity:0.45;font-size:10px">시&nbsp;</span>${fmt(candle.open)}</div>
+          <div><span style="opacity:0.45;font-size:10px">고&nbsp;</span><span style="color:${up}">${fmt(candle.high)}</span></div>
+          <div><span style="opacity:0.45;font-size:10px">저&nbsp;</span><span style="color:${dn}">${fmt(candle.low)}</span></div>
+          <div><span style="opacity:0.45;font-size:10px">종&nbsp;</span><span style="color:${cl};font-weight:600">${fmt(candle.close)}</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:baseline;margin-top:3px;font-size:11px;line-height:1.4">
+          <span style="color:${cl}">${isUp ? '+' : ''}${fmt(chg)}&nbsp;(${isUp ? '+' : ''}${pct}%)</span>
+          <span style="opacity:0.35;font-size:10px">${fmtObv(candle.volume)}</span>
         </div>`;
 
       // ── 지표값 ────────────────────────────────────────────────────────────────
@@ -286,25 +295,25 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       const indItems: string[] = [];
       for (const { period, s } of [...overlayRef.current.ma].sort((a, b) => a.period - b.period)) {
         const v = lineVal(sd, s);
-        if (v !== null) indItems.push(`<span style="opacity:0.5;color:${MA_SOLID[period]}">MA${period}</span><span>${fmt(Math.round(v))}</span>`);
+        if (v !== null) indItems.push(`<div><span style="color:${MA_SOLID[period]};font-size:10px">MA${period}&nbsp;</span>${fmt(Math.round(v))}</div>`);
       }
       const { bbUpper, bbMid, bbLower } = overlayRef.current;
-      if (bbUpper) { const v = lineVal(sd, bbUpper); if (v !== null) indItems.push(`<span style="opacity:0.5;color:#818cf8">BB상</span><span>${fmt(Math.round(v))}</span>`); }
-      if (bbMid)   { const v = lineVal(sd, bbMid);   if (v !== null) indItems.push(`<span style="opacity:0.5;color:#6366f1">BB중</span><span>${fmt(Math.round(v))}</span>`); }
-      if (bbLower) { const v = lineVal(sd, bbLower);  if (v !== null) indItems.push(`<span style="opacity:0.5;color:#818cf8">BB하</span><span>${fmt(Math.round(v))}</span>`); }
+      if (bbUpper) { const v = lineVal(sd, bbUpper); if (v !== null) indItems.push(`<div><span style="color:#818cf8;font-size:10px">BB상&nbsp;</span>${fmt(Math.round(v))}</div>`); }
+      if (bbMid)   { const v = lineVal(sd, bbMid);   if (v !== null) indItems.push(`<div><span style="color:#6366f1;font-size:10px">BB중&nbsp;</span>${fmt(Math.round(v))}</div>`); }
+      if (bbLower) { const v = lineVal(sd, bbLower);  if (v !== null) indItems.push(`<div><span style="color:#818cf8;font-size:10px">BB하&nbsp;</span>${fmt(Math.round(v))}</div>`); }
       if (rsiS) {
         const v = lineVal(sd, rsiS);
         if (v !== null) {
           const rc = v >= 70 ? up : v <= 30 ? dn : '#a78bfa';
-          indItems.push(`<span style="opacity:0.5;color:#a78bfa">RSI</span><span style="color:${rc};font-weight:600">${v.toFixed(2)}</span>`);
+          indItems.push(`<div><span style="color:#a78bfa;font-size:10px">RSI&nbsp;</span><span style="color:${rc};font-weight:600">${v.toFixed(2)}</span></div>`);
         }
       }
       if (obvS) {
         const v = lineVal(sd, obvS);
-        if (v !== null) indItems.push(`<span style="opacity:0.5;color:#34d399">OBV</span><span style="color:#34d399">${fmtObv(v)}</span>`);
+        if (v !== null) indItems.push(`<div><span style="color:#34d399;font-size:10px">OBV&nbsp;</span><span style="color:#34d399">${fmtObv(v)}</span></div>`);
       }
       if (indItems.length > 0) {
-        html += `<div style="margin-top:4px;padding-top:4px;border-top:1px solid rgba(128,128,128,0.15);display:grid;grid-template-columns:auto auto;gap:1px 10px;font-size:11px;line-height:1.55">${indItems.join('')}</div>`;
+        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.15);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;line-height:1.6">${indItems.join('')}</div>`;
       }
 
       tooltip.innerHTML = html;
@@ -316,20 +325,13 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       const tw = tooltip.offsetWidth  || 150;
       const th = tooltip.offsetHeight || 100;
       const OFFSET = 12;
-      // 오른쪽 공간 부족하면 왼쪽으로
       const left = param.point.x + OFFSET + tw > cw
         ? param.point.x - OFFSET - tw
         : param.point.x + OFFSET;
-      // 종가 Y를 중심으로 세로 위치, 화면 밖 클램핑
       const top = Math.max(4, Math.min(container.clientHeight - th - 4, closeY - th / 2));
 
       tooltip.style.left = `${Math.max(4, left)}px`;
       tooltip.style.top  = `${top}px`;
-
-      // 가로 크로스헤어를 항상 종가에 고정 (MA·BB 선에 끌려가는 현상 방지)
-      settingCrosshair = true;
-      chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
-      settingCrosshair = false;
     });
 
     // ResizeObserver
