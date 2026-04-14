@@ -324,10 +324,21 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     });
     ro.observe(containerRef.current);
 
+    // 모바일 사파리에서 핀치 제스처를 브라우저가 가로채지 않도록 처리
+    // passive: false → preventDefault() 호출 가능, 빠른 핀치에도 브라우저 기본 동작 차단
+    const el = containerRef.current;
+    const blockPinch = (e: TouchEvent) => {
+      if (e.touches.length >= 2) e.preventDefault();
+    };
+    el.addEventListener('touchstart', blockPinch, { passive: false });
+    el.addEventListener('touchmove',  blockPinch, { passive: false });
+
     chartRef.current        = chart;
     candleSeriesRef.current = candleSeries;
 
     return () => {
+      el.removeEventListener('touchstart', blockPinch);
+      el.removeEventListener('touchmove',  blockPinch);
       // 서브 패널 높이만 저장 (가격 패널은 항상 나머지로 계산)
       let si = 1;
       if (indicators.volume) savePaneH(PANE_KEYS.vol, chart.panes()[si++].getHeight());
