@@ -2,10 +2,21 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, TrendingUp, MessageSquare, Menu, X, Monitor, Sun, Moon } from 'lucide-react';
+import {
+  Home,
+  TrendingUp,
+  MessageSquare,
+  Menu,
+  X,
+  Monitor,
+  Sun,
+  Moon,
+  Star,
+} from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme-provider';
+import { useFavorites } from '@/contexts/FavoritesContext';
 
 const navItems = [
   { href: '/', label: '홈', icon: Home },
@@ -23,6 +34,7 @@ export function LeftNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
+  const { favorites, removeFavorite } = useFavorites();
 
   return (
     <>
@@ -71,29 +83,84 @@ export function LeftNav() {
           </button>
         </div>
 
-        {/* 네비게이션 메뉴 */}
-        <nav className="flex-1 overflow-y-auto p-2 py-4">
-          {navItems.map(({ href, label, icon: Icon }) => {
-            const isActive =
-              href === '/' ? pathname === '/' : pathname.startsWith(href);
-            return (
-              <Link
-                key={href}
-                href={href}
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors',
-                  isActive
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                )}
-              >
-                <Icon className="size-4 shrink-0" />
-                {label}
-              </Link>
-            );
-          })}
-        </nav>
+        {/* 스크롤 영역 */}
+        <div className="flex-1 overflow-y-auto flex flex-col">
+          {/* 네비게이션 메뉴 */}
+          <nav className="p-2 pt-4">
+            {navItems.map(({ href, label, icon: Icon }) => {
+              const isActive =
+                href === '/' ? pathname === '/' : pathname.startsWith(href);
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={() => setIsOpen(false)}
+                  className={cn(
+                    'flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  {label}
+                </Link>
+              );
+            })}
+          </nav>
+
+          {/* 즐겨찾기 섹션 */}
+          <div className="p-2 pt-2 mt-1">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 mb-1">
+              <Star className="size-3.5 text-amber-500" />
+              <span className="text-xs font-semibold text-sidebar-foreground/60 uppercase tracking-wider">
+                즐겨찾기
+              </span>
+            </div>
+
+            {favorites.length === 0 ? (
+              <p className="px-3 py-2 text-xs text-sidebar-foreground/40">
+                종목 페이지에서 별표를 눌러 추가하세요
+              </p>
+            ) : (
+              favorites.map((stock) => {
+                const isActive = pathname === `/stocks/${stock.code}`;
+                return (
+                  <div
+                    key={stock.code}
+                    className={cn(
+                      'group flex items-center gap-2 px-3 py-2 rounded-lg mb-0.5 transition-colors',
+                      isActive
+                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    )}
+                  >
+                    <Link
+                      href={`/stocks/${stock.code}`}
+                      onClick={() => setIsOpen(false)}
+                      className="flex-1 flex items-center gap-2 min-w-0 text-sm"
+                    >
+                      <span className="truncate font-medium">{stock.name}</span>
+                      <span className="text-xs opacity-50 shrink-0">{stock.code}</span>
+                    </Link>
+                    <button
+                      onClick={() => removeFavorite(stock.code)}
+                      className={cn(
+                        'shrink-0 opacity-0 group-hover:opacity-100 transition-opacity h-5 w-5 flex items-center justify-center rounded',
+                        isActive
+                          ? 'hover:bg-white/20'
+                          : 'hover:bg-sidebar-border',
+                      )}
+                      aria-label={`${stock.name} 즐겨찾기 해제`}
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
 
         {/* 하단 테마 설정 */}
         <div className="p-3 border-t border-sidebar-border shrink-0">

@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import StockChartSection from '@/components/stock/StockChartSection';
+import { FavoriteButton } from '@/components/stock/FavoriteButton';
 
 interface Props {
   params: Promise<{ code: string }>;
@@ -40,7 +41,7 @@ export default async function StockPage({ params }: Props) {
   return (
     <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
       <div className="mx-auto max-w-5xl">
-        <div className="mb-6 flex items-center gap-3">
+        <div className="mb-6 flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-foreground">{stock.name}</h1>
           <span className="rounded bg-secondary px-2 py-0.5 text-sm text-secondary-foreground">
             {stock.code}
@@ -48,6 +49,7 @@ export default async function StockPage({ params }: Props) {
           <span className="rounded bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
             {stock.market}
           </span>
+          <FavoriteButton code={stock.code} name={stock.name} />
         </div>
 
         <StockChartSection code={code} />
