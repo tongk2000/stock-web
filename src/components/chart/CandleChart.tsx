@@ -156,7 +156,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       grid: { vertLines: { color: theme.grid }, horzLines: { color: theme.grid } },
       rightPriceScale: { borderColor: theme.border },
       timeScale: { borderColor: theme.border, fixLeftEdge: true, fixRightEdge: true },
-      crosshair: { mode: CrosshairMode.Magnet },
+      crosshair: { mode: CrosshairMode.Normal },
       handleScroll: {
         vertTouchDrag: false,
       },
@@ -239,7 +239,10 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     }
 
     // 크로스헤어 툴팁 (overlayRef를 실시간으로 읽음)
+    // setCrosshairPosition 호출이 다시 콜백을 트리거하지 않도록 재진입 방지
+    let settingCrosshair = false;
     chart.subscribeCrosshairMove((param) => {
+      if (settingCrosshair) return;
       const tooltip = tooltipRef.current, container = containerRef.current;
       if (!tooltip || !container) return;
       if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
@@ -311,6 +314,11 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       if (top + th > ch) top = param.point.y - th - 10;
       tooltip.style.left = `${Math.max(4, left)}px`;
       tooltip.style.top  = `${Math.max(4, top)}px`;
+
+      // 가로 크로스헤어를 항상 종가에 고정 (MA·BB 선에 끌려가는 현상 방지)
+      settingCrosshair = true;
+      chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
+      settingCrosshair = false;
     });
 
     // ResizeObserver
@@ -507,7 +515,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       <div
         ref={tooltipRef}
         style={{ display: 'none' }}
-        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/50 px-3 py-2.5 text-foreground shadow-lg backdrop-blur-sm"
+        className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/30 px-3 py-2.5 text-foreground shadow-lg backdrop-blur-sm"
       />
     </div>
   );
