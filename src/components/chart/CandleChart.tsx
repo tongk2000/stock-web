@@ -40,16 +40,11 @@ const MA_SOLID: Record<number, string> = {
 };
 
 const CHART_COLORS = {
-  dark:  { text: '#a1a1aa', grid: '#27272a', border: '#3f3f46', volUp: 'rgba(239,68,68,0.35)',  volDown: 'rgba(59,130,246,0.35)'  },
-  light: { text: '#52525b', grid: '#f4f4f5', border: '#d4d4d8', volUp: 'rgba(220,38,38,0.3)',   volDown: 'rgba(37,99,235,0.3)'    },
+  dark:  { text: '#a1a1aa', grid: '#27272a', border: '#333338', volUp: '#ef4444', volDown: '#3b82f6' },
+  light: { text: '#52525b', grid: '#f4f4f5', border: '#e4e4e7', volUp: '#ef4444', volDown: '#3b82f6' },
 };
 
-// 외부 CSS 박스 높이 (JS와 무관하게 페이지 레이아웃을 고정)
-const CHART_HEIGHT  = 590; // px — 타임스케일 포함 전체
-const TIMESCALE_H   = 28;  // lightweight-charts 기본 타임스케일 높이 (근사값)
-const PANE_AREA     = CHART_HEIGHT - TIMESCALE_H; // 순수 패널 영역 (562px)
 const DEFAULT_SUB_H = 100; // 서브 패널 기본 높이
-const MIN_PRICE_H   = 200; // 가격 패널 최소 높이
 
 // 서브 패널별 독립 키 — 추가/제거 시 다른 패널 높이에 영향 없음
 // 가격 패널 높이는 저장하지 않음 (항상 PANE_AREA - subTotal 로 계산)
@@ -107,6 +102,11 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
 
     const theme = isDark ? CHART_COLORS.dark : CHART_COLORS.light;
 
+    const CHART_HEIGHT = containerRef.current.clientHeight || 450;
+    const TIMESCALE_H = 28;
+    const MIN_PRICE_H = 150;
+    const PANE_AREA = CHART_HEIGHT - TIMESCALE_H;
+
     // 각 서브 패널 높이를 독립적으로 불러옴
     const rawVol = indicators.volume ? loadPaneH(PANE_KEYS.vol, DEFAULT_SUB_H) : 0;
     const rawRsi = indicators.rsi    ? loadPaneH(PANE_KEYS.rsi, DEFAULT_SUB_H) : 0;
@@ -125,14 +125,38 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     // 가격 패널 = 나머지 전부 (항상 >= MIN_PRICE_H, lwc 정규화 없음)
     const priceH = PANE_AREA - subTotal;
 
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768;
+
     // CSS 박스와 동일한 높이로 차트 생성 → JS가 DOM 높이를 변경해도 레이아웃 영향 없음
     const chart = createChart(containerRef.current, {
       width: containerRef.current.clientWidth,
       height: CHART_HEIGHT,
-      layout: { background: { color: 'transparent' }, textColor: theme.text },
+      layout: { 
+        background: { color: 'transparent' }, 
+        textColor: theme.text,
+        fontSize: isMobile ? 10 : 12,
+        attributionLogo: false,
+        panes: {
+          separatorColor: theme.border,
+          separatorHoverColor: theme.border,
+        },
+      } as any,
+      localization: {
+        priceFormatter: (price: number) => {
+          const a = Math.abs(price);
+          if (isMobile && a >= 1000) {
+            if (a >= 1000000) return (price / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
+            return (price / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
+          }
+          return Math.round(price).toLocaleString('en-US');
+        },
+      },
       grid: { vertLines: { color: theme.grid }, horzLines: { color: theme.grid } },
       rightPriceScale: { borderColor: theme.border },
       timeScale: { borderColor: theme.border, fixLeftEdge: true, fixRightEdge: true },
+      handleScroll: {
+        vertTouchDrag: false,
+      },
     });
 
     // 캔들 시리즈
@@ -156,10 +180,13 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
       chart.addPane();
       chart.addSeries(HistogramSeries, {
         priceScaleId: 'volume', priceLineVisible: false, lastValueVisible: false,
-      }, nextPane).setData(candles.map((c) => ({
-        time: c.date as Time, value: c.volume,
-        color: c.close >= c.open ? theme.volUp : theme.volDown,
-      })));
+      }, nextPane).setData(candles.map((c, i) => {
+        const prevVol = i > 0 ? candles[i - 1].volume : 0;
+        return {
+          time: c.date as Time, value: c.volume,
+          color: c.volume >= prevVol ? theme.volUp : theme.volDown,
+        };
+      }));
       nextPane++;
     }
 
@@ -199,7 +226,14 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
     if (indicators.rsi)    { chart.panes()[pi++].setHeight(rsiH); }
     if (indicators.obv)    { chart.panes()[pi++].setHeight(obvH); }
 
-    chart.timeScale().fitContent();
+    if (candles.length > 60) {
+      chart.timeScale().setVisibleLogicalRange({
+        from: candles.length - 60,
+        to: candles.length - 1,
+      });
+    } else {
+      chart.timeScale().fitContent();
+    }
 
     // 크로스헤어 툴팁 (overlayRef를 실시간으로 읽음)
     chart.subscribeCrosshairMove((param) => {
@@ -278,7 +312,12 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
 
     // ResizeObserver
     const ro = new ResizeObserver(() => {
-      if (containerRef.current) chart.applyOptions({ width: containerRef.current.clientWidth });
+      if (containerRef.current) {
+        chart.applyOptions({ 
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight
+        });
+      }
     });
     ro.observe(containerRef.current);
 
@@ -350,7 +389,7 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
   // 내부 containerRef: absolute inset-0 으로 래퍼를 채움
   // → lightweight-charts가 JS로 높이를 조정해도 래퍼 바깥 레이아웃에 영향 없음
   return (
-    <div className="relative w-full" style={{ height: CHART_HEIGHT }}>
+    <div className="relative w-full h-[450px] md:h-[590px]">
       <div ref={containerRef} className="absolute inset-0" />
       <div
         ref={tooltipRef}

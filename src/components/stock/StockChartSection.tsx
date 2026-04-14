@@ -1,21 +1,28 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
+import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
-import type { Candle } from '@/types/stock';
+import { aggregateCandles } from '@/lib/indicators';
+import type { Candle, CandleType } from '@/types/stock';
 import type { IndicatorOptions } from '@/components/chart/CandleChart';
 
 const CandleChart = dynamic(() => import('@/components/chart/CandleChart'), {
   ssr: false,
-  loading: () => <div className="h-[590px] w-full animate-pulse rounded-xl bg-muted" />,
+  loading: () => <div className="h-[450px] md:h-[590px] w-full animate-pulse rounded-xl bg-muted" />,
 });
 
 type ExchangeType = '통합' | 'KRX' | 'NXT';
 
 const EXCHANGES: ExchangeType[] = ['통합', 'KRX', 'NXT'];
+const CANDLE_TYPES: { value: CandleType; label: string }[] = [
+  { value: 'daily', label: '일봉' },
+  { value: 'weekly', label: '주봉' },
+  { value: 'monthly', label: '월봉' },
+];
 const MA_PERIODS = [5, 20, 60, 120] as const;
 
 const MA_COLORS: Record<number, string> = {
@@ -84,7 +91,7 @@ function ToggleBtn({
       className={cn(
         'rounded px-2.5 py-1 text-xs font-medium transition-colors',
         active && !accentColor
-          ? 'bg-secondary text-secondary-foreground outline outline-1 outline-border'
+          ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
           : !active
             ? 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             : '',
@@ -107,9 +114,14 @@ function ToggleBtn({
 export default function StockChartSection({ code }: Props) {
   const isDark = useIsDark();
   const [exchange, setExchange] = useState<ExchangeType>('통합');
-  const [candles, setCandles] = useState<Candle[]>([]);
+  const [candleType, setCandleType] = useState<CandleType>('daily');
+  const [allCandles, setAllCandles] = useState<Candle[]>([]);
+  
+  const candles = useMemo(() => aggregateCandles(allCandles, candleType), [allCandles, candleType]);
+  
   const [loading, setLoading] = useState(true);
   const [indicators, setIndicators] = useState<IndicatorOptions>(DEFAULT_INDICATORS);
+  const [showIndicators, setShowIndicators] = useState(false);
   // localStorage 복원이 완료됐는지 추적 — 복원 전에 DEFAULT로 덮어쓰는 것을 방지
   const [initialized, setInitialized] = useState(false);
 
@@ -148,7 +160,7 @@ export default function StockChartSection({ code }: Props) {
             .eq('candle_type', 'daily')
             .order('date', { ascending: true }),
         ]);
-        setCandles(mergeCandles(krxRes.data ?? [], nxtRes.data ?? []));
+        setAllCandles(mergeCandles(krxRes.data ?? [], nxtRes.data ?? []));
       } else {
         const { data } = await supabase
           .from('candles')
@@ -157,7 +169,7 @@ export default function StockChartSection({ code }: Props) {
           .eq('exchange', exchange)
           .eq('candle_type', 'daily')
           .order('date', { ascending: true });
-        setCandles(data ?? []);
+        setAllCandles(data ?? []);
       }
       setLoading(false);
     }
@@ -211,74 +223,114 @@ export default function StockChartSection({ code }: Props) {
       </div>
 
       {/* 차트 영역 */}
-      <div className="rounded-xl border border-border bg-card/50 p-4">
+      <div className="rounded-xl border border-border bg-card/50 p-1 sm:p-4">
         {/* 컨트롤 바 */}
-        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-          {/* 거래소 탭 */}
-          <div className="flex gap-1">
-            {EXCHANGES.map((ex) => {
-              const isNxt = ex === 'NXT';
-              return (
-                <button
-                  key={ex}
-                  type="button"
-                  onClick={() => !isNxt && setExchange(ex)}
-                  disabled={isNxt}
-                  className={cn(
-                    'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                    exchange === ex && !isNxt
-                      ? 'bg-secondary text-secondary-foreground'
-                      : isNxt
-                        ? 'cursor-not-allowed text-muted-foreground/40'
+        <div className="mb-3 flex flex-col gap-2">
+          {/* 상단 탭 및 설정 토글 버튼 */}
+          <div className="flex items-center justify-between">
+            <div className="flex flex-wrap gap-2">
+              <div className="flex gap-1">
+                {EXCHANGES.map((ex) => {
+                  const isNxt = ex === 'NXT';
+                  return (
+                    <button
+                      key={ex}
+                      type="button"
+                      onClick={() => !isNxt && setExchange(ex)}
+                      disabled={isNxt}
+                      className={cn(
+                        'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                        exchange === ex && !isNxt
+                          ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
+                          : isNxt
+                            ? 'cursor-not-allowed text-muted-foreground/40'
+                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                      )}
+                    >
+                      {ex}
+                      {isNxt && <span className="ml-1.5 text-xs opacity-50">준비 중</span>}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="h-4 w-px self-center bg-border" />
+              <div className="flex gap-1">
+                {CANDLE_TYPES.map((ct) => (
+                  <button
+                    key={ct.value}
+                    type="button"
+                    onClick={() => setCandleType(ct.value)}
+                    className={cn(
+                      'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                      candleType === ct.value
+                        ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
                         : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                  )}
-                >
-                  {ex}
-                  {isNxt && <span className="ml-1.5 text-xs opacity-50">준비 중</span>}
-                </button>
-              );
-            })}
+                    )}
+                  >
+                    {ct.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            
+            <button
+              type="button"
+              onClick={() => setShowIndicators(!showIndicators)}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+            >
+              <SlidersHorizontal size={14} />
+              <span className="hidden sm:inline">지표 설정</span>
+              {showIndicators ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+            </button>
           </div>
 
-          <div className="h-4 w-px bg-border" />
+          {/* 보조지표 설정 영역 */}
+          {showIndicators && (
+            <div className="flex flex-col gap-2 rounded-lg border border-border/40 bg-muted/10 p-2.5">
+              {/* 이평선 + BB (오버레이 그룹) */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-12 text-xs font-medium text-muted-foreground">오버레이</span>
+                <div className="flex items-center gap-1">
+                  <span className="mr-1 text-[10px] text-muted-foreground">MA</span>
+                  {MA_PERIODS.map((p) => (
+                    <ToggleBtn
+                      key={p}
+                      active={indicators.ma.includes(p)}
+                      onClick={() => toggleMA(p)}
+                      accentColor={MA_COLORS[p]}
+                    >
+                      {p}
+                    </ToggleBtn>
+                  ))}
+                  <div className="mx-1 h-3 w-px bg-border/60" />
+                  <ToggleBtn active={indicators.bb} onClick={() => toggleFlag('bb')} accentColor="#6366f1">
+                    BB
+                  </ToggleBtn>
+                </div>
+              </div>
 
-          {/* 이평선 + BB (오버레이 그룹) */}
-          <div className="flex items-center gap-1">
-            <span className="mr-1 text-xs text-muted-foreground">MA</span>
-            {MA_PERIODS.map((p) => (
-              <ToggleBtn
-                key={p}
-                active={indicators.ma.includes(p)}
-                onClick={() => toggleMA(p)}
-                accentColor={MA_COLORS[p]}
-              >
-                {p}
-              </ToggleBtn>
-            ))}
-            <ToggleBtn active={indicators.bb} onClick={() => toggleFlag('bb')} accentColor="#6366f1">
-              BB
-            </ToggleBtn>
-          </div>
-
-          <div className="h-4 w-px bg-border" />
-
-          {/* 서브 패널 지표 */}
-          <div className="flex gap-1">
-            <ToggleBtn active={indicators.volume} onClick={() => toggleFlag('volume')}>
-              VOL
-            </ToggleBtn>
-            <ToggleBtn active={indicators.rsi} onClick={() => toggleFlag('rsi')} accentColor="#a78bfa">
-              RSI
-            </ToggleBtn>
-            <ToggleBtn active={indicators.obv} onClick={() => toggleFlag('obv')} accentColor="#34d399">
-              OBV
-            </ToggleBtn>
-          </div>
+              {/* 서브 패널 지표 */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="w-12 text-xs font-medium text-muted-foreground">하단지표</span>
+                <div className="flex gap-1">
+                  <ToggleBtn active={indicators.volume} onClick={() => toggleFlag('volume')}>
+                    VOL
+                  </ToggleBtn>
+                  <ToggleBtn active={indicators.rsi} onClick={() => toggleFlag('rsi')} accentColor="#a78bfa">
+                    RSI
+                  </ToggleBtn>
+                  <ToggleBtn active={indicators.obv} onClick={() => toggleFlag('obv')} accentColor="#34d399">
+                    OBV
+                  </ToggleBtn>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 차트 */}
         {loading ? (
-          <div className="h-[590px] w-full animate-pulse rounded-xl bg-muted" />
+          <div className="h-[450px] md:h-[590px] w-full animate-pulse rounded-xl bg-muted" />
         ) : candles.length > 0 ? (
           <CandleChart candles={candles} indicators={indicators} isDark={isDark} />
         ) : (
