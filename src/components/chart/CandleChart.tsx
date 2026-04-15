@@ -89,6 +89,8 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
   // 메모 Map ref — 클릭/크로스헤어 콜백에서 최신 값 읽기 위한 ref
   const memosRef        = useRef<Map<string, string>>(memos ?? new Map());
   const onDateClickRef  = useRef<((date: string) => void) | undefined>(onDateClick);
+  // 크로스헤어가 현재 가리키는 날짜 — 모바일에서 탭 좌표 오차 없이 정확한 날짜 전달
+  const hoveredDateRef  = useRef<string | null>(null);
 
   // memos / onDateClick 변경 시 ref 동기화
   useEffect(() => { memosRef.current = memos ?? new Map(); }, [memos]);
@@ -306,6 +308,9 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       const ohlc   = param.seriesData.get(candleSeries) as CandlestickData | undefined;
       if (!candle || !ohlc) { tooltip.style.display = 'none'; return; }
 
+      // 크로스헤어가 정확히 가리키는 날짜를 기록 (클릭 시 이 값 사용)
+      hoveredDateRef.current = candle.date;
+
       // 가로 크로스헤어를 항상 종가에 고정 — tooltip on/off와 무관하게 항상 실행
       settingCrosshair = true;
       chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
@@ -393,9 +398,11 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
     });
 
     // 캔들 클릭 → 날짜 콜백
-    chart.subscribeClick((param) => {
-      if (!param.time || !onDateClickRef.current) return;
-      onDateClickRef.current(param.time as string);
+    // 모바일 탭 좌표 오차 방지: param.time 대신 crosshairMove에서 기록한 날짜 사용
+    chart.subscribeClick(() => {
+      const date = hoveredDateRef.current;
+      if (!date || !onDateClickRef.current) return;
+      onDateClickRef.current(date);
     });
 
     // ResizeObserver
