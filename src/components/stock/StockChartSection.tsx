@@ -404,44 +404,6 @@ export default function StockChartSection({ code }: Props) {
         )}
       </div>
 
-      {/* ── 저장된 메모 목록 ─────────────────────────────────────────────────────── */}
-      {Object.keys(memoRecord).length > 0 && (
-        <div className="mt-4 rounded-xl border border-border bg-card/50 p-4">
-          <h3 className="mb-3 text-sm font-semibold text-foreground">저장된 메모</h3>
-          <ul className="space-y-2">
-            {Object.entries(memoRecord)
-              .sort(([a], [b]) => b.localeCompare(a))
-              .map(([date, content]) => (
-                <li
-                  key={date}
-                  className="flex items-start justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5 text-sm transition-colors hover:bg-accent/50"
-                >
-                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="text-xs font-medium text-muted-foreground">{date}</span>
-                    <span className="break-words text-sm text-foreground">{content}</span>
-                  </div>
-                  <div className="flex shrink-0 gap-1">
-                    <button
-                      type="button"
-                      onClick={() => { setSelectedDate(date); setMemoInput(content); }}
-                      className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
-                    >
-                      편집
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteMemo(date)}
-                      className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      삭제
-                    </button>
-                  </div>
-                </li>
-              ))}
-          </ul>
-        </div>
-      )}
-
       {/* ── 메모 모달 ────────────────────────────────────────────────────────────── */}
       {selectedDate && (
         <div
