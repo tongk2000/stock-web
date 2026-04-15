@@ -133,25 +133,28 @@ export default function StockChartSection({ code }: Props) {
 
   const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
 
-  const memoStorageKey = `chart-memos-${code}`;
-
   // hydration 후 localStorage 복원 (SSR 불일치 방지)
   useEffect(() => {
     setIndicators(loadIndicators());
     setInitialized(true);
   }, []);
 
-  // 종목 변경 시 메모 불러오기
+  // 종목 변경 시 Supabase에서 메모 불러오기
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(memoStorageKey);
-      setMemoRecord(raw ? JSON.parse(raw) : {});
-    } catch {
-      setMemoRecord({});
-    }
+    setMemoRecord({});
     setSelectedDate(null);
     setMemoInput('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const supabase = createClient();
+    supabase
+      .from('chart_notes')
+      .select('date, content')
+      .eq('stock_code', code)
+      .then(({ data }) => {
+        if (!data) return;
+        const record: Record<string, string> = {};
+        for (const note of data) record[note.date] = note.content;
+        setMemoRecord(record);
+      });
   }, [code]);
 
   // 초기화 완료 후에만 저장 (마운트 직후 DEFAULT로 덮어쓰는 버그 방지)
@@ -209,27 +212,36 @@ export default function StockChartSection({ code }: Props) {
 
   const saveMemo = useCallback(() => {
     if (!selectedDate) return;
-    let next: Record<string, string>;
-    if (memoInput.trim()) {
-      next = { ...memoRecord, [selectedDate]: memoInput.trim() };
+    const trimmed = memoInput.trim();
+    // 낙관적 업데이트
+    if (trimmed) {
+      setMemoRecord((prev) => ({ ...prev, [selectedDate]: trimmed }));
     } else {
-      const { [selectedDate]: _, ...rest } = memoRecord;
-      next = rest;
+      setMemoRecord((prev) => { const { [selectedDate]: _, ...rest } = prev; return rest; });
     }
-    setMemoRecord(next);
-    try { localStorage.setItem(memoStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
     setSelectedDate(null);
     setMemoInput('');
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDate, memoInput, memoRecord]);
+    // Supabase 동기화
+    const supabase = createClient();
+    if (trimmed) {
+      supabase.from('chart_notes').upsert(
+        { stock_code: code, date: selectedDate, content: trimmed, updated_at: new Date().toISOString() },
+        { onConflict: 'stock_code,date' },
+      ).then();
+    } else {
+      supabase.from('chart_notes').delete()
+        .eq('stock_code', code).eq('date', selectedDate).then();
+    }
+  }, [selectedDate, memoInput, code]);
 
   const deleteMemo = useCallback((date: string) => {
-    const { [date]: _, ...next } = memoRecord;
-    setMemoRecord(next);
-    try { localStorage.setItem(memoStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
+    setMemoRecord((prev) => { const { [date]: _, ...rest } = prev; return rest; });
     if (selectedDate === date) { setSelectedDate(null); setMemoInput(''); }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memoRecord, selectedDate]);
+    // Supabase 동기화
+    const supabase = createClient();
+    supabase.from('chart_notes').delete()
+      .eq('stock_code', code).eq('date', date).then();
+  }, [selectedDate, code]);
 
   function toggleMA(period: number) {
     setIndicators((prev) => ({
