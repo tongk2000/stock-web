@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
@@ -130,7 +130,6 @@ export default function StockChartSection({ code }: Props) {
   const [memoRecord, setMemoRecord] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [memoInput, setMemoInput] = useState('');
-  const memoTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
 
@@ -203,14 +202,10 @@ export default function StockChartSection({ code }: Props) {
 
   // ── 메모 핸들러 ───────────────────────────────────────────────────────────────
   const handleDateClick = useCallback((date: string) => {
+    setMemoInput(memoRecord[date] ?? '');
     setSelectedDate(date);
-    setMemoInput((prev) => {
-      // 이미 같은 날짜가 선택돼 있으면 기존 입력값 유지
-      return date === selectedDate ? prev : (memoRecord[date] ?? '');
-    });
-    setTimeout(() => memoTextareaRef.current?.focus(), 50);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memoRecord, selectedDate]);
+  }, [memoRecord]);
 
   const saveMemo = useCallback(() => {
     if (!selectedDate) return;
@@ -408,54 +403,6 @@ export default function StockChartSection({ code }: Props) {
         )}
       </div>
 
-      {/* ── 메모 에디터 ─────────────────────────────────────────────────────────── */}
-      {selectedDate && (
-        <div className="mt-4 rounded-xl border border-border bg-card/50 p-4">
-          <div className="mb-3 flex items-center justify-between">
-            <span className="text-sm font-semibold text-foreground">
-              {selectedDate} 메모
-            </span>
-            <button
-              type="button"
-              onClick={() => { setSelectedDate(null); setMemoInput(''); }}
-              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              <X size={14} />
-            </button>
-          </div>
-          <textarea
-            ref={memoTextareaRef}
-            value={memoInput}
-            onChange={(e) => setMemoInput(e.target.value)}
-            placeholder="이 날의 메모를 입력하세요..."
-            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            rows={3}
-            maxLength={500}
-          />
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">{memoInput.length} / 500</span>
-            <div className="flex gap-2">
-              {memoRecord[selectedDate] && (
-                <button
-                  type="button"
-                  onClick={() => deleteMemo(selectedDate)}
-                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                >
-                  삭제
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={saveMemo}
-                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm ring-1 ring-border/50 hover:bg-accent/80"
-              >
-                저장
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* ── 저장된 메모 목록 ─────────────────────────────────────────────────────── */}
       {Object.keys(memoRecord).length > 0 && (
         <div className="mt-4 rounded-xl border border-border bg-card/50 p-4">
@@ -466,12 +413,7 @@ export default function StockChartSection({ code }: Props) {
               .map(([date, content]) => (
                 <li
                   key={date}
-                  className={cn(
-                    'flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
-                    selectedDate === date
-                      ? 'bg-accent ring-1 ring-border/50'
-                      : 'bg-muted/30 hover:bg-accent/50',
-                  )}
+                  className="flex items-start justify-between gap-3 rounded-lg bg-muted/30 px-3 py-2.5 text-sm transition-colors hover:bg-accent/50"
                 >
                   <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                     <span className="text-xs font-medium text-muted-foreground">{date}</span>
@@ -480,11 +422,7 @@ export default function StockChartSection({ code }: Props) {
                   <div className="flex shrink-0 gap-1">
                     <button
                       type="button"
-                      onClick={() => {
-                        setSelectedDate(date);
-                        setMemoInput(content);
-                        setTimeout(() => memoTextareaRef.current?.focus(), 50);
-                      }}
+                      onClick={() => { setSelectedDate(date); setMemoInput(content); }}
                       className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
                     >
                       편집
@@ -500,6 +438,65 @@ export default function StockChartSection({ code }: Props) {
                 </li>
               ))}
           </ul>
+        </div>
+      )}
+
+      {/* ── 메모 모달 ────────────────────────────────────────────────────────────── */}
+      {selectedDate && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          onClick={() => { setSelectedDate(null); setMemoInput(''); }}
+        >
+          <div
+            className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">메모</p>
+                <p className="text-sm font-semibold text-foreground">{selectedDate}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setSelectedDate(null); setMemoInput(''); }}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <textarea
+
+              value={memoInput}
+              onChange={(e) => setMemoInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveMemo(); }}
+              placeholder="이 날의 메모를 입력하세요..."
+              className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              rows={4}
+              maxLength={500}
+              autoFocus
+            />
+            <div className="mt-3 flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">{memoInput.length} / 500</span>
+              <div className="flex gap-2">
+                {memoRecord[selectedDate] && (
+                  <button
+                    type="button"
+                    onClick={() => deleteMemo(selectedDate)}
+                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    삭제
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={saveMemo}
+                  className="rounded-lg bg-violet-500/20 px-4 py-1.5 text-xs font-semibold text-violet-400 ring-1 ring-violet-500/30 hover:bg-violet-500/30"
+                >
+                  저장
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
 

@@ -364,11 +364,14 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
         html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.15);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;line-height:1.6">${indItems.join('')}</div>`;
       }
 
-      // ── 메모 표시기 ────────────────────────────────────────────────────────────
-      if (memosRef.current.has(candle.date)) {
-        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.15);font-size:10px;color:#a78bfa">✎ 메모 있음 · 클릭해서 편집</div>`;
+      // ── 메모 (내용 직접 표시) ──────────────────────────────────────────────────
+      const memo = memosRef.current.get(candle.date);
+      if (memo) {
+        // 긴 메모는 말줄임 처리
+        const preview = memo.length > 60 ? memo.slice(0, 60) + '…' : memo;
+        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(167,139,250,0.3);font-size:10px;color:#a78bfa;line-height:1.5;word-break:break-all">✎&nbsp;${preview}</div>`;
       } else {
-        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.12);font-size:10px;opacity:0.35">클릭하면 메모 추가</div>`;
+        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.12);font-size:10px;opacity:0.3">✎ 클릭하면 메모 추가</div>`;
       }
 
       tooltip.innerHTML = html;
