@@ -13,14 +13,12 @@
  * 높이는 h-14(56px)로 고정. LeftNav의 sticky top 값과 맞춰야 합니다.
  */
 
-import { Menu, Moon, Sun } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import StockSearch from '@/components/stock/StockSearch';
-import { useTheme } from '@/components/theme-provider';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useScrollAtTop } from '@/hooks/useScrollAtTop';
 
 export default function AppHeader() {
-  const { theme, setTheme } = useTheme();
   const { toggle } = useSidebar();
   const isAtTop = useScrollAtTop();
 
@@ -43,15 +41,6 @@ export default function AppHeader() {
           <StockSearch />
         </div>
 
-        {/* 테마 토글 */}
-        <button
-          onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-          aria-label="테마 전환"
-        >
-          <Moon className="hidden size-5 dark:block" />
-          <Sun className="block size-5 dark:hidden" />
-        </button>
       </div>
     </header>
   );
