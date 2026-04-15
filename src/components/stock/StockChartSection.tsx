@@ -1,8 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useMemo } from 'react';
-import { ChevronDown, ChevronUp, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
+import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
@@ -117,20 +117,43 @@ export default function StockChartSection({ code }: Props) {
   const [exchange, setExchange] = useState<ExchangeType>('통합');
   const [candleType, setCandleType] = useState<CandleType>('daily');
   const [allCandles, setAllCandles] = useState<Candle[]>([]);
-  
+
   const candles = useMemo(() => aggregateCandles(allCandles, candleType), [allCandles, candleType]);
-  
+
   const [loading, setLoading] = useState(true);
   const [indicators, setIndicators] = useState<IndicatorOptions>(DEFAULT_INDICATORS);
   const [showIndicators, setShowIndicators] = useState(false);
   // localStorage 복원이 완료됐는지 추적 — 복원 전에 DEFAULT로 덮어쓰는 것을 방지
   const [initialized, setInitialized] = useState(false);
 
+  // ── 메모 상태 ─────────────────────────────────────────────────────────────────
+  const [memoRecord, setMemoRecord] = useState<Record<string, string>>({});
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [memoInput, setMemoInput] = useState('');
+  const memoTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
+
+  const memoStorageKey = `chart-memos-${code}`;
+
   // hydration 후 localStorage 복원 (SSR 불일치 방지)
   useEffect(() => {
     setIndicators(loadIndicators());
     setInitialized(true);
   }, []);
+
+  // 종목 변경 시 메모 불러오기
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(memoStorageKey);
+      setMemoRecord(raw ? JSON.parse(raw) : {});
+    } catch {
+      setMemoRecord({});
+    }
+    setSelectedDate(null);
+    setMemoInput('');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   // 초기화 완료 후에만 저장 (마운트 직후 DEFAULT로 덮어쓰는 버그 방지)
   useEffect(() => {
@@ -177,6 +200,40 @@ export default function StockChartSection({ code }: Props) {
 
     fetchCandles();
   }, [code, exchange]);
+
+  // ── 메모 핸들러 ───────────────────────────────────────────────────────────────
+  const handleDateClick = useCallback((date: string) => {
+    setSelectedDate(date);
+    setMemoInput((prev) => {
+      // 이미 같은 날짜가 선택돼 있으면 기존 입력값 유지
+      return date === selectedDate ? prev : (memoRecord[date] ?? '');
+    });
+    setTimeout(() => memoTextareaRef.current?.focus(), 50);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoRecord, selectedDate]);
+
+  const saveMemo = useCallback(() => {
+    if (!selectedDate) return;
+    let next: Record<string, string>;
+    if (memoInput.trim()) {
+      next = { ...memoRecord, [selectedDate]: memoInput.trim() };
+    } else {
+      const { [selectedDate]: _, ...rest } = memoRecord;
+      next = rest;
+    }
+    setMemoRecord(next);
+    try { localStorage.setItem(memoStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
+    if (!memoInput.trim()) setSelectedDate(null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, memoInput, memoRecord]);
+
+  const deleteMemo = useCallback((date: string) => {
+    const { [date]: _, ...next } = memoRecord;
+    setMemoRecord(next);
+    try { localStorage.setItem(memoStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
+    if (selectedDate === date) { setSelectedDate(null); setMemoInput(''); }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memoRecord, selectedDate]);
 
   function toggleMA(period: number) {
     setIndicators((prev) => ({
@@ -337,13 +394,114 @@ export default function StockChartSection({ code }: Props) {
         {loading ? (
           <div className="h-[450px] md:h-[590px] w-full animate-pulse rounded-xl bg-muted" />
         ) : candles.length > 0 ? (
-          <CandleChart candles={candles} indicators={indicators} isDark={isDark} />
+          <CandleChart
+            candles={candles}
+            indicators={indicators}
+            isDark={isDark}
+            memos={memosMap}
+            onDateClick={handleDateClick}
+          />
         ) : (
           <div className="flex h-[400px] items-center justify-center text-muted-foreground">
             {exchange} 데이터가 없습니다.
           </div>
         )}
       </div>
+
+      {/* ── 메모 에디터 ─────────────────────────────────────────────────────────── */}
+      {selectedDate && (
+        <div className="mt-4 rounded-xl border border-border bg-card/50 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <span className="text-sm font-semibold text-foreground">
+              {selectedDate} 메모
+            </span>
+            <button
+              type="button"
+              onClick={() => { setSelectedDate(null); setMemoInput(''); }}
+              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <X size={14} />
+            </button>
+          </div>
+          <textarea
+            ref={memoTextareaRef}
+            value={memoInput}
+            onChange={(e) => setMemoInput(e.target.value)}
+            placeholder="이 날의 메모를 입력하세요..."
+            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            rows={3}
+            maxLength={500}
+          />
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-xs text-muted-foreground">{memoInput.length} / 500</span>
+            <div className="flex gap-2">
+              {memoRecord[selectedDate] && (
+                <button
+                  type="button"
+                  onClick={() => deleteMemo(selectedDate)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                >
+                  삭제
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={saveMemo}
+                className="rounded-lg bg-accent px-3 py-1.5 text-xs font-semibold text-foreground shadow-sm ring-1 ring-border/50 hover:bg-accent/80"
+              >
+                저장
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── 저장된 메모 목록 ─────────────────────────────────────────────────────── */}
+      {Object.keys(memoRecord).length > 0 && (
+        <div className="mt-4 rounded-xl border border-border bg-card/50 p-4">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">저장된 메모</h3>
+          <ul className="space-y-2">
+            {Object.entries(memoRecord)
+              .sort(([a], [b]) => b.localeCompare(a))
+              .map(([date, content]) => (
+                <li
+                  key={date}
+                  className={cn(
+                    'flex items-start justify-between gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors',
+                    selectedDate === date
+                      ? 'bg-accent ring-1 ring-border/50'
+                      : 'bg-muted/30 hover:bg-accent/50',
+                  )}
+                >
+                  <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                    <span className="text-xs font-medium text-muted-foreground">{date}</span>
+                    <span className="break-words text-sm text-foreground">{content}</span>
+                  </div>
+                  <div className="flex shrink-0 gap-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedDate(date);
+                        setMemoInput(content);
+                        setTimeout(() => memoTextareaRef.current?.focus(), 50);
+                      }}
+                      className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-background hover:text-foreground"
+                    >
+                      편집
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteMemo(date)}
+                      className="rounded px-2 py-1 text-xs text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </li>
+              ))}
+          </ul>
+        </div>
+      )}
 
     </div>
   );

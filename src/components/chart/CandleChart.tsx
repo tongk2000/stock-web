@@ -29,6 +29,8 @@ interface Props {
   candles: Candle[];
   indicators: IndicatorOptions;
   isDark: boolean;
+  memos?: Map<string, string>;
+  onDateClick?: (date: string) => void;
 }
 
 const MA_COLORS: Record<number, string> = {
@@ -78,12 +80,19 @@ function lineVal(seriesData: Map<ISeriesApi<'Line'>, unknown>, s: ISeriesApi<'Li
   return (seriesData.get(s) as LineData | undefined)?.value ?? null;
 }
 
-export default function CandleChart({ candles, indicators, isDark }: Props) {
+export default function CandleChart({ candles, indicators, isDark, memos, onDateClick }: Props) {
   const wrapperRef      = useRef<HTMLDivElement>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
   const tooltipRef      = useRef<HTMLDivElement>(null);
   // 스테일 클로저 없이 툴팁 on/off를 crosshairMove 콜백에서 읽기 위한 ref
   const showTooltipRef  = useRef(indicators.tooltip);
+  // 메모 Map ref — 클릭/크로스헤어 콜백에서 최신 값 읽기 위한 ref
+  const memosRef        = useRef<Map<string, string>>(memos ?? new Map());
+  const onDateClickRef  = useRef<((date: string) => void) | undefined>(onDateClick);
+
+  // memos / onDateClick 변경 시 ref 동기화
+  useEffect(() => { memosRef.current = memos ?? new Map(); }, [memos]);
+  useEffect(() => { onDateClickRef.current = onDateClick; }, [onDateClick]);
 
   // indicators.tooltip 변경 시 ref 동기화 + 즉시 숨김 처리
   useEffect(() => {
@@ -355,6 +364,13 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
         html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.15);display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;font-size:11px;line-height:1.6">${indItems.join('')}</div>`;
       }
 
+      // ── 메모 표시기 ────────────────────────────────────────────────────────────
+      if (memosRef.current.has(candle.date)) {
+        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.15);font-size:10px;color:#a78bfa">✎ 메모 있음 · 클릭해서 편집</div>`;
+      } else {
+        html += `<div style="margin-top:5px;padding-top:5px;border-top:1px solid rgba(128,128,128,0.12);font-size:10px;opacity:0.35">클릭하면 메모 추가</div>`;
+      }
+
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
 
@@ -371,6 +387,12 @@ export default function CandleChart({ candles, indicators, isDark }: Props) {
 
       tooltip.style.left = `${Math.max(4, left)}px`;
       tooltip.style.top  = `${top}px`;
+    });
+
+    // 캔들 클릭 → 날짜 콜백
+    chart.subscribeClick((param) => {
+      if (!param.time || !onDateClickRef.current) return;
+      onDateClickRef.current(param.time as string);
     });
 
     // ResizeObserver
