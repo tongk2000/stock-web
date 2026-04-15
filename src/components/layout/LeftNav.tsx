@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme-provider';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useScrollAtTop } from '@/hooks/useScrollAtTop';
 
 const navItems = [
   { href: '/', label: '홈', icon: Home },
@@ -44,6 +45,7 @@ export function LeftNav() {
   const { theme, setTheme } = useTheme();
   const { favorites, removeFavorite } = useFavorites();
   const { isOpen, close } = useSidebar();
+  const isAtTop = useScrollAtTop();
 
   return (
     <>
@@ -59,8 +61,10 @@ export function LeftNav() {
       <aside
         className={cn(
           'fixed top-0 left-0 h-full z-50 w-64 flex flex-col bg-sidebar border-r border-sidebar-border',
-          // 데스크탑: sticky, AppHeader(h-14) 바로 아래에 붙도록 top-14
-          'sm:sticky sm:top-14 sm:h-[calc(100vh-3.5rem)] sm:z-auto',
+          // 데스크탑: sticky, 헤더 표시 시 top-14, 헤더 숨김 시 top-0
+          isAtTop
+            ? 'sm:sticky sm:top-14 sm:h-[calc(100vh-3.5rem)] sm:z-auto'
+            : 'sm:sticky sm:top-0 sm:h-screen sm:z-auto',
           'transition-transform duration-300 ease-in-out',
           isOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0',
         )}

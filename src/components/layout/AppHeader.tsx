@@ -17,13 +17,17 @@ import { Menu, Moon, Sun } from 'lucide-react';
 import StockSearch from '@/components/stock/StockSearch';
 import { useTheme } from '@/components/theme-provider';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useScrollAtTop } from '@/hooks/useScrollAtTop';
 
 export default function AppHeader() {
   const { theme, setTheme } = useTheme();
   const { toggle } = useSidebar();
+  const isAtTop = useScrollAtTop();
 
   return (
-    <header className="sticky top-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur-sm">
+    <header
+      className={`sticky top-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur-sm transition-transform duration-300 ease-in-out${isAtTop ? '' : ' -translate-y-full'}`}
+    >
       <div className="mx-auto flex h-full max-w-none items-center gap-2 px-3 sm:px-4">
         {/* 햄버거 버튼: 모바일에서만 표시 */}
         <button
