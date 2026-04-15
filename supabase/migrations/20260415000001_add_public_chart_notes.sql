@@ -1,22 +1,25 @@
 -- ============================================================
--- 로그인 없이 공개로 사용하는 차트 메모 (종목당 날짜별 1개)
+-- chart_memos 프로토타입용 수정
+--   - user_id: NOT NULL 제거 + FK 제거 (로그인 붙이면 원복)
+--   - unique(stock_code, date): 날짜당 메모 1개
+--   - RLS: 비로그인 포함 전체 공개
 -- ============================================================
-create table public.chart_notes (
-  id          uuid primary key default gen_random_uuid(),
-  stock_code  text not null references public.stocks(code) on delete cascade,
-  date        date not null,
-  content     text not null check (char_length(content) <= 500),
-  created_at  timestamptz not null default now(),
-  updated_at  timestamptz not null default now(),
-  unique (stock_code, date)
-);
 
-create index idx_notes_stock_date on public.chart_notes (stock_code, date);
+alter table public.chart_memos
+  alter column user_id drop not null;
 
-alter table public.chart_notes enable row level security;
+alter table public.chart_memos
+  drop constraint if exists chart_memos_user_id_fkey;
 
--- 비로그인 포함 전체 공개
-create policy "notes_select" on public.chart_notes for select using (true);
-create policy "notes_insert" on public.chart_notes for insert with check (true);
-create policy "notes_update" on public.chart_notes for update using (true) with check (true);
-create policy "notes_delete" on public.chart_notes for delete using (true);
+alter table public.chart_memos
+  add constraint chart_memos_stock_date_unique unique (stock_code, date);
+
+-- 기존 RLS 정책 교체
+drop policy if exists "memos_select" on public.chart_memos;
+drop policy if exists "memos_insert" on public.chart_memos;
+drop policy if exists "memos_delete" on public.chart_memos;
+
+create policy "memos_select" on public.chart_memos for select using (true);
+create policy "memos_insert" on public.chart_memos for insert with check (true);
+create policy "memos_update" on public.chart_memos for update using (true) with check (true);
+create policy "memos_delete" on public.chart_memos for delete using (true);

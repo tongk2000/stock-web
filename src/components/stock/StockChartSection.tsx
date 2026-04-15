@@ -146,7 +146,7 @@ export default function StockChartSection({ code }: Props) {
     setMemoInput('');
     const supabase = createClient();
     supabase
-      .from('chart_notes')
+      .from('chart_memos')
       .select('date, content')
       .eq('stock_code', code)
       .then(({ data }) => {
@@ -224,12 +224,12 @@ export default function StockChartSection({ code }: Props) {
     // Supabase 동기화
     const supabase = createClient();
     if (trimmed) {
-      supabase.from('chart_notes').upsert(
-        { stock_code: code, date: selectedDate, content: trimmed, updated_at: new Date().toISOString() },
+      supabase.from('chart_memos').upsert(
+        { stock_code: code, date: selectedDate, content: trimmed },
         { onConflict: 'stock_code,date' },
       ).then();
     } else {
-      supabase.from('chart_notes').delete()
+      supabase.from('chart_memos').delete()
         .eq('stock_code', code).eq('date', selectedDate).then();
     }
   }, [selectedDate, memoInput, code]);
@@ -239,7 +239,7 @@ export default function StockChartSection({ code }: Props) {
     if (selectedDate === date) { setSelectedDate(null); setMemoInput(''); }
     // Supabase 동기화
     const supabase = createClient();
-    supabase.from('chart_notes').delete()
+    supabase.from('chart_memos').delete()
       .eq('stock_code', code).eq('date', date).then();
   }, [selectedDate, code]);
 
