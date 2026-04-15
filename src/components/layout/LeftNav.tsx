@@ -1,22 +1,31 @@
 'use client';
 
+/**
+ * LeftNav
+ *
+ * 왼쪽 사이드바 내비게이션입니다.
+ *
+ * - 데스크탑: 항상 표시 (sticky, top-14 = AppHeader 높이만큼 내려옴)
+ * - 모바일: 기본 숨김, AppHeader 햄버거 버튼으로 열기/닫기
+ *           열림 상태는 SidebarContext에서 관리 (AppHeader와 공유)
+ */
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home,
   TrendingUp,
   MessageSquare,
-  Menu,
   X,
   Monitor,
   Sun,
   Moon,
   Star,
 } from 'lucide-react';
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme-provider';
 import { useFavorites } from '@/contexts/FavoritesContext';
+import { useSidebar } from '@/contexts/SidebarContext';
 
 const navItems = [
   { href: '/', label: '홈', icon: Home },
@@ -32,26 +41,17 @@ const themeOptions = [
 
 export function LeftNav() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
   const { theme, setTheme } = useTheme();
   const { favorites, removeFavorite } = useFavorites();
+  const { isOpen, close } = useSidebar();
 
   return (
     <>
-      {/* 모바일 햄버거 버튼 */}
-      <button
-        onClick={() => setIsOpen(true)}
-        className="fixed top-4 left-4 z-50 sm:hidden flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg"
-        aria-label="메뉴 열기"
-      >
-        <Menu className="size-5" />
-      </button>
-
       {/* 모바일 배경 오버레이 */}
       {isOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/50 sm:hidden"
-          onClick={() => setIsOpen(false)}
+          onClick={close}
         />
       )}
 
@@ -59,24 +59,25 @@ export function LeftNav() {
       <aside
         className={cn(
           'fixed top-0 left-0 h-full z-50 w-64 flex flex-col bg-sidebar border-r border-sidebar-border',
-          'sm:sticky sm:top-0 sm:h-screen sm:z-auto',
+          // 데스크탑: sticky, AppHeader(h-14) 바로 아래에 붙도록 top-14
+          'sm:sticky sm:top-14 sm:h-[calc(100vh-3.5rem)] sm:z-auto',
           'transition-transform duration-300 ease-in-out',
           isOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0',
         )}
       >
-        {/* 로고 영역 */}
-        <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border shrink-0">
+        {/* 모바일 사이드바 헤더 (로고 + 닫기 버튼) */}
+        <div className="flex items-center justify-between h-16 px-4 border-b border-sidebar-border shrink-0 sm:hidden">
           <Link
             href="/"
-            onClick={() => setIsOpen(false)}
+            onClick={close}
             className="flex items-center gap-2 font-bold text-sidebar-foreground hover:text-sidebar-foreground/80 transition-colors"
           >
             <TrendingUp className="size-5 text-sidebar-primary" />
             <span className="text-lg">주식 앱</span>
           </Link>
           <button
-            onClick={() => setIsOpen(false)}
-            className="sm:hidden h-8 w-8 flex items-center justify-center rounded-md hover:bg-sidebar-accent text-sidebar-foreground transition-colors"
+            onClick={close}
+            className="h-8 w-8 flex items-center justify-center rounded-md hover:bg-sidebar-accent text-sidebar-foreground transition-colors"
             aria-label="메뉴 닫기"
           >
             <X className="size-4" />
@@ -94,7 +95,7 @@ export function LeftNav() {
                 <Link
                   key={href}
                   href={href}
-                  onClick={() => setIsOpen(false)}
+                  onClick={close}
                   className={cn(
                     'flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors',
                     isActive
@@ -137,7 +138,7 @@ export function LeftNav() {
                   >
                     <Link
                       href={`/stocks/${stock.code}`}
-                      onClick={() => setIsOpen(false)}
+                      onClick={close}
                       className="flex-1 flex items-center gap-2 min-w-0 text-sm"
                     >
                       <span className="truncate font-medium">{stock.name}</span>

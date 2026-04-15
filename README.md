@@ -20,15 +20,26 @@
 ```
 src/
 ├── app/                        # Next.js App Router
-│   ├── layout.tsx              # 루트 레이아웃 (QueryProvider 포함)
-│   └── page.tsx
+│   ├── layout.tsx              # 루트 레이아웃
+│   │                           #   ThemeProvider > FavoritesProvider > SidebarProvider
+│   │                           #   AppHeader (상단 고정) + LeftNav + {children}
+│   ├── page.tsx                # 홈 (검색 안내 페이지)
+│   └── stocks/[code]/
+│       └── page.tsx            # 종목 상세 (차트 + 즐겨찾기)
 ├── components/
 │   ├── layout/
+│   │   ├── AppHeader.tsx       # 공통 상단 헤더 (햄버거·검색창·테마 토글)
+│   │   ├── LeftNav.tsx         # 왼쪽 사이드바 (네비·즐겨찾기·테마)
 │   │   └── query-provider.tsx  # TanStack Query 클라이언트 provider
 │   ├── chart/                  # 차트 관련 컴포넌트
-│   ├── discussion/             # 토론방 관련 컴포넌트
-│   ├── stock/                  # 종목 관련 컴포넌트
+│   ├── stock/
+│   │   ├── StockSearch.tsx     # 종목 검색창 (AppHeader에서 재사용)
+│   │   ├── StockChartSection.tsx
+│   │   └── FavoriteButton.tsx  # 즐겨찾기 추가/해제 버튼
 │   └── ui/                     # shadcn/ui 컴포넌트
+├── contexts/
+│   ├── FavoritesContext.tsx    # 즐겨찾기 목록 (localStorage 기반)
+│   └── SidebarContext.tsx      # 사이드바 열림 상태 (AppHeader ↔ LeftNav 공유)
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts           # 클라이언트 컴포넌트용 Supabase 클라이언트
@@ -42,6 +53,22 @@ src/
 supabase/
 └── migrations/
     └── 20260413000001_init_schema.sql  # 초기 DB 스키마
+```
+
+## 레이아웃 구조
+
+```
+┌─────────────────────────────────────┐  ← AppHeader (h-14, sticky top-0)
+│  ☰  [종목 검색창]        [테마 토글]  │    모바일 ☰ → SidebarContext.toggle()
+├──────────┬──────────────────────────┤
+│          │                          │
+│  LeftNav │  page content            │
+│  (w-64)  │                          │
+│          │                          │
+└──────────┴──────────────────────────┘
+
+모바일: LeftNav 기본 숨김, ☰ 버튼으로 슬라이드 인/아웃
+데스크탑(sm+): LeftNav 항상 표시, ☰ 버튼 숨김
 ```
 
 ## DB 스키마
