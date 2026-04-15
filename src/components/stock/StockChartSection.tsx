@@ -218,7 +218,8 @@ export default function StockChartSection({ code }: Props) {
     }
     setMemoRecord(next);
     try { localStorage.setItem(memoStorageKey, JSON.stringify(next)); } catch { /* ignore */ }
-    if (!memoInput.trim()) setSelectedDate(null);
+    setSelectedDate(null);
+    setMemoInput('');
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDate, memoInput, memoRecord]);
 
@@ -444,45 +445,49 @@ export default function StockChartSection({ code }: Props) {
       {/* ── 메모 모달 ────────────────────────────────────────────────────────────── */}
       {selectedDate && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm sm:items-center"
           onClick={() => { setSelectedDate(null); setMemoInput(''); }}
         >
           <div
-            className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-5 shadow-2xl"
+            className="w-full rounded-t-2xl border border-border bg-card px-5 pb-8 pt-5 shadow-2xl sm:mx-4 sm:max-w-sm sm:rounded-2xl sm:pb-5"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* 모바일 드래그 핸들 */}
+            <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-border sm:hidden" />
+
             <div className="mb-4 flex items-center justify-between">
               <div>
                 <p className="text-xs text-muted-foreground">메모</p>
-                <p className="text-sm font-semibold text-foreground">{selectedDate}</p>
+                <p className="text-base font-semibold text-foreground">{selectedDate}</p>
               </div>
               <button
                 type="button"
                 onClick={() => { setSelectedDate(null); setMemoInput(''); }}
-                className="rounded-lg p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
+                className="rounded-xl p-2 text-muted-foreground active:bg-accent"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
-            <textarea
 
+            <textarea
               value={memoInput}
               onChange={(e) => setMemoInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) saveMemo(); }}
               placeholder="이 날의 메모를 입력하세요..."
-              className="w-full resize-none rounded-xl border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               rows={4}
               maxLength={500}
               autoFocus
             />
-            <div className="mt-3 flex items-center justify-between">
+
+            <div className="mt-4 flex items-center justify-between">
               <span className="text-xs text-muted-foreground">{memoInput.length} / 500</span>
               <div className="flex gap-2">
                 {memoRecord[selectedDate] && (
                   <button
                     type="button"
                     onClick={() => deleteMemo(selectedDate)}
-                    className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    className="rounded-xl px-4 py-2.5 text-sm font-medium text-muted-foreground active:bg-destructive/10 active:text-destructive"
                   >
                     삭제
                   </button>
@@ -490,7 +495,7 @@ export default function StockChartSection({ code }: Props) {
                 <button
                   type="button"
                   onClick={saveMemo}
-                  className="rounded-lg bg-violet-500/20 px-4 py-1.5 text-xs font-semibold text-violet-400 ring-1 ring-violet-500/30 hover:bg-violet-500/30"
+                  className="rounded-xl bg-violet-500/20 px-5 py-2.5 text-sm font-semibold text-violet-400 ring-1 ring-violet-500/30 active:bg-violet-500/30"
                 >
                   저장
                 </button>
