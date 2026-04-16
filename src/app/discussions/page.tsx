@@ -19,18 +19,28 @@ function formatRelativeTime(dateStr: string): string {
 export default async function DiscussionsPage() {
   const supabase = await createClient();
 
-  const { data: posts } = await supabase
+  const { data: posts, error } = await supabase
     .from('posts')
-    .select('id, content, created_at, like_count, stock_code, profiles(nickname, is_premium)')
+    .select('id, content, created_at, like_count, stock_code, user_id')
     .order('created_at', { ascending: false })
     .limit(50);
 
+  if (error) console.error('[discussions] posts query error:', error);
+
   const stockCodes = [...new Set((posts ?? []).map((p) => p.stock_code))];
-  const { data: stocks } = stockCodes.length
-    ? await supabase.from('stocks').select('code, name').in('code', stockCodes)
-    : { data: [] };
+  const userIds = [...new Set((posts ?? []).map((p) => p.user_id))];
+
+  const [{ data: stocks }, { data: profiles }] = await Promise.all([
+    stockCodes.length
+      ? supabase.from('stocks').select('code, name').in('code', stockCodes)
+      : Promise.resolve({ data: [] }),
+    userIds.length
+      ? supabase.from('profiles').select('id, nickname, is_premium').in('id', userIds)
+      : Promise.resolve({ data: [] }),
+  ]);
 
   const stockMap = new Map((stocks ?? []).map((s) => [s.code, s.name]));
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
   return (
     <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
@@ -44,9 +54,7 @@ export default async function DiscussionsPage() {
         ) : (
           <div className="space-y-2">
             {posts.map((post) => {
-              const profile = Array.isArray(post.profiles)
-                ? post.profiles[0]
-                : post.profiles;
+              const profile = profileMap.get(post.user_id);
               return (
                 <Link
                   key={post.id}
