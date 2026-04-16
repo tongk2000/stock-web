@@ -53,7 +53,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
     const supabase = createClient();
     supabase
       .from('posts')
-      .select('id, content, created_at, like_count, user_id, profiles(nickname, score, is_premium)')
+      .select('id, content, created_at, like_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
       .eq('room_id', roomId)
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE)
@@ -87,7 +87,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
         async (payload) => {
           const { data } = await supabase
             .from('posts')
-            .select('id, content, created_at, like_count, user_id, profiles(nickname, score, is_premium)')
+            .select('id, content, created_at, like_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
             .eq('id', payload.new.id)
             .single();
           if (data) setPosts((prev) => [data as PostWithAuthor, ...prev]);
