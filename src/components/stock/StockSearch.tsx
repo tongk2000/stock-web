@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useRef, useState, useDeferredValue, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
 import type { Stock } from '@/types/stock';
@@ -10,16 +10,21 @@ type SearchResult = Pick<Stock, 'code' | 'name' | 'market'>;
 
 export default function StockSearch() {
   const router = useRouter();
+  const pathname = usePathname();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
-  const deferredQuery = useDeferredValue(query);
 
   useEffect(() => {
-    const q = deferredQuery.trim();
+    setIsNavigating(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    const q = query.trim();
     if (q.length < 1) {
       setResults([]);
       setIsOpen(false);
@@ -27,19 +32,23 @@ export default function StockSearch() {
     }
 
     setLoading(true);
-    const supabase = createClient();
-    supabase
-      .from('stocks')
-      .select('code, name, market')
-      .or(`name.ilike.%${q}%,code.ilike.%${q}%`)
-      .limit(10)
-      .then(({ data }) => {
-        setResults(data ?? []);
-        setIsOpen(true);
-        setActiveIndex(-1);
-        setLoading(false);
-      });
-  }, [deferredQuery]);
+    const timer = setTimeout(() => {
+      const supabase = createClient();
+      supabase
+        .from('stocks')
+        .select('code, name, market')
+        .or(`name.ilike.%${q}%,code.ilike.%${q}%`)
+        .limit(10)
+        .then(({ data }) => {
+          setResults(data ?? []);
+          setIsOpen(true);
+          setActiveIndex(-1);
+          setLoading(false);
+        });
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [query]);
 
   useEffect(() => {
     function handleMouseDown(e: MouseEvent) {
@@ -55,6 +64,7 @@ export default function StockSearch() {
     (code: string) => {
       setIsOpen(false);
       setQuery('');
+      setIsNavigating(true);
       router.push(`/stocks/${code}`);
     },
     [router],
@@ -87,17 +97,19 @@ export default function StockSearch() {
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={() => results.length > 0 && setIsOpen(true)}
-          placeholder="종목명 또는 종목코드 검색"
+          placeholder={isNavigating ? '종목 불러오는 중...' : '종목명 또는 종목코드 검색'}
+          disabled={isNavigating}
           className={cn(
             'w-full rounded-xl border border-input bg-card px-5 py-3.5',
             'text-foreground placeholder:text-muted-foreground outline-none',
             'focus:border-ring focus:ring-1 focus:ring-ring',
             'text-base transition-colors',
+            isNavigating && 'cursor-wait opacity-70',
           )}
           autoComplete="off"
           spellCheck={false}
         />
-        {loading && (
+        {(loading || isNavigating) && (
           <div className="absolute right-4 h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-foreground" />
         )}
       </div>
