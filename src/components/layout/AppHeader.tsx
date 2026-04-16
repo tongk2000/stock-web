@@ -22,7 +22,7 @@ import { useAuth } from '@/contexts/AuthContext';
 export default function AppHeader() {
   const { toggle } = useSidebar();
   const isAtTop = useScrollAtTop();
-  const { user, loading, signInWithGoogle, signOut } = useAuth();
+  const { user, nickname, loading, signInWithGoogle, signOut } = useAuth();
 
   return (
     <header
@@ -57,6 +57,11 @@ export default function AppHeader() {
                 <div className="flex h-8 w-8 items-center justify-center rounded-full bg-accent text-accent-foreground">
                   <User size={16} />
                 </div>
+              )}
+              {nickname && (
+                <span className="hidden sm:block text-sm font-medium text-foreground">
+                  {nickname}
+                </span>
               )}
               <button
                 onClick={signOut}
