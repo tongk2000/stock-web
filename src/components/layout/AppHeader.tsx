@@ -26,7 +26,7 @@ export default function AppHeader() {
     <header
       className={`sticky top-0 z-50 h-14 border-b border-border bg-background/95 backdrop-blur-sm transition-transform duration-150 ease-in-out${isAtTop ? '' : ' -translate-y-full'}`}
     >
-      <div className="mx-auto flex h-full max-w-none items-center gap-2 px-3 sm:px-4">
+      <div className="mx-auto flex h-full max-w-none items-center gap-2 px-3 sm:px-4 sm:pl-64">
         {/* 햄버거 버튼: 모바일에서만 표시 */}
         <button
           onClick={toggle}
