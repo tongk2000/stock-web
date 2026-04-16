@@ -6,6 +6,7 @@ import AppHeader from "@/components/layout/AppHeader";
 import { ThemeProvider } from "@/components/theme-provider";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
+import { AuthProvider } from "@/contexts/AuthContext";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -56,6 +57,7 @@ export default function RootLayout({
        */}
       <body className="min-h-full flex flex-col">
         <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+          <AuthProvider>
           <FavoritesProvider>
             <SidebarProvider>
               <AppHeader />
@@ -69,6 +71,7 @@ export default function RootLayout({
               </div>
             </SidebarProvider>
           </FavoritesProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>
