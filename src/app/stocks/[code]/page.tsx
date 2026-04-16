@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import StockChartSection from '@/components/stock/StockChartSection';
 import { FavoriteButton } from '@/components/stock/FavoriteButton';
+import DiscussionSection from '@/components/discussion/DiscussionSection';
 
 interface Props {
   params: Promise<{ code: string }>;
@@ -24,11 +25,15 @@ export default async function StockPage({ params }: Props) {
   const { code } = await params;
   const supabase = await createClient();
 
-  const { data: stock } = await supabase
-    .from('stocks')
-    .select('code, name, market')
-    .eq('code', code)
-    .single();
+  const [{ data: stock }, { data: room }] = await Promise.all([
+    supabase.from('stocks').select('code, name, market').eq('code', code).single(),
+    supabase
+      .from('discussion_rooms')
+      .select('id')
+      .eq('stock_code', code)
+      .eq('is_official', true)
+      .single(),
+  ]);
 
   if (!stock) {
     return (
@@ -53,6 +58,8 @@ export default async function StockPage({ params }: Props) {
         </div>
 
         <StockChartSection code={code} />
+
+        {room && <DiscussionSection roomId={room.id} stockCode={code} />}
       </div>
     </main>
   );
