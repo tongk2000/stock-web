@@ -1,3 +1,16 @@
+/**
+ * FavoritesContext
+ *
+ * 즐겨찾기 종목 목록을 전역으로 관리하는 Context입니다.
+ *
+ * 저장소 전략:
+ *   - 로그인 유저 : Supabase `favorites` 테이블 (서버 동기화)
+ *   - 비로그인     : localStorage (`stock-favorites` 키)
+ *
+ * 로그인 상태가 바뀌면 자동으로 저장소를 전환합니다.
+ * LeftNav의 즐겨찾기 섹션과 FavoriteButton에서 사용합니다.
+ */
+
 'use client';
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';

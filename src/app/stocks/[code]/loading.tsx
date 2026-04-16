@@ -1,3 +1,4 @@
+/** 종목 상세 페이지 로딩 스켈레톤 (Next.js Suspense 자동 연동) */
 export default function StockLoading() {
   return (
     <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">

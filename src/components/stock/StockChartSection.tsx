@@ -1,3 +1,25 @@
+/**
+ * StockChartSection
+ *
+ * 종목 상세 페이지의 차트 영역 전체를 담당하는 클라이언트 컴포넌트입니다.
+ *
+ * 구성:
+ *   1. 가격 정보 (현재가, 등락률)
+ *   2. 컨트롤 바 (거래소 탭 · 봉 타입 탭 · 보조지표 설정)
+ *   3. CandleChart (dynamic import, SSR 비활성화)
+ *   4. 메모 모달 (차트 캔들 클릭 시 열림)
+ *
+ * 데이터 흐름:
+ *   - Supabase에서 일봉(KRX/NXT) fetch → 통합 시 mergeCandles로 합산
+ *   - 봉 타입 변경 시 aggregateCandles로 주봉/월봉 집계
+ *   - 보조지표 설정은 localStorage에 저장/복원 (hydration 불일치 방지)
+ *
+ * 메모:
+ *   - 로그인 유저만 차트 날짜 클릭으로 메모 작성 가능
+ *   - Supabase chart_memos 테이블에 upsert/delete
+ *   - 낙관적 업데이트로 즉시 반영
+ */
+
 'use client';
 
 import dynamic from 'next/dynamic';
@@ -25,6 +47,7 @@ const CANDLE_TYPES: { value: CandleType; label: string }[] = [
 ];
 const MA_PERIODS = [5, 20, 60, 120] as const;
 
+// 이평선 기간별 색상 — CandleChart의 MA_SOLID와 동일한 값 (토글 버튼 accent용)
 const MA_COLORS: Record<number, string> = {
   5: '#d97706',
   20: '#2563eb',
@@ -58,6 +81,7 @@ interface Props {
   code: string;
 }
 
+/** KRX·NXT 일봉을 날짜 기준으로 합산 (고가=max, 저가=min, 거래량=합계, 종가=KRX 기준) */
 function mergeCandles(krx: Candle[], nxt: Candle[]): Candle[] {
   const nxtMap = new Map(nxt.map((c) => [c.date, c]));
   return krx.map((k) => {

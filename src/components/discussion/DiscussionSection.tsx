@@ -1,3 +1,16 @@
+/**
+ * DiscussionSection
+ *
+ * 종목 상세 페이지 하단에 표시되는 토론방 섹션입니다.
+ *
+ * 기능:
+ *   - 게시글 목록 조회 (최신순 30개)
+ *   - 실시간 구독 (Supabase Realtime: INSERT / UPDATE / DELETE)
+ *   - 글 작성 (로그인 필수, Ctrl+Enter 단축키)
+ *   - 좋아요 토글 (낙관적 업데이트)
+ *   - 본인 글 삭제 (낙관적 삭제)
+ */
+
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
@@ -6,7 +19,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import CommentSection from './CommentSection';
+import { formatRelativeTime } from '@/lib/format';
 
+/** 게시글 + 작성자 프로필 조인 결과 타입 */
 type PostWithAuthor = {
   id: string;
   content: string;
@@ -27,18 +42,6 @@ interface Props {
 }
 
 const PAGE_SIZE = 30;
-
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '방금';
-  if (min < 60) return `${min}분 전`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}시간 전`;
-  const day = Math.floor(hour / 24);
-  if (day < 7) return `${day}일 전`;
-  return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-}
 
 export default function DiscussionSection({ roomId, stockCode }: Props) {
   const { user } = useAuth();

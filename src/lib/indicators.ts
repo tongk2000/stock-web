@@ -1,7 +1,16 @@
+/**
+ * 기술적 지표 계산 함수 모음
+ *
+ * CandleChart에서 사용하는 보조지표(MA, BB, RSI, OBV)와
+ * 일봉→주봉/월봉 집계(aggregateCandles)를 제공합니다.
+ * 모든 함수는 순수 함수로, 캔들 배열을 입력받아 시계열 데이터를 반환합니다.
+ */
+
 import type { Candle, CandleType } from '@/types/stock';
 
 // ── 이동평균선 ────────────────────────────────────────────────────────────────
 
+/** N기간 단순 이동평균선(SMA) 계산 */
 export function calcMA(
   candles: Candle[],
   period: number,
@@ -24,6 +33,7 @@ export interface BBPoint {
   lower: number;
 }
 
+/** 볼린저밴드 계산 (기본: 20기간, 2σ) */
 export function calcBB(candles: Candle[], period = 20, mult = 2): BBPoint[] {
   const result: BBPoint[] = [];
   for (let i = period - 1; i < candles.length; i++) {
@@ -42,6 +52,7 @@ export function calcBB(candles: Candle[], period = 20, mult = 2): BBPoint[] {
 
 // ── RSI ──────────────────────────────────────────────────────────────────────
 
+/** RSI(상대강도지수) 계산 — Wilder 평활법 적용 (기본 14기간) */
 export function calcRSI(
   candles: Candle[],
   period = 14,
@@ -79,6 +90,7 @@ export function calcRSI(
 
 // ── OBV ──────────────────────────────────────────────────────────────────────
 
+/** OBV(거래량 균형 지표) 계산 — 종가 상승 시 +volume, 하락 시 -volume */
 export function calcOBV(candles: Candle[]): { time: string; value: number }[] {
   const result: { time: string; value: number }[] = [];
   let obv = 0;
@@ -97,6 +109,12 @@ export function calcOBV(candles: Candle[]): { time: string; value: number }[] {
 
 // ── 데이터 집계 (주봉, 월봉) ──────────────────────────────────────────────────
 
+/**
+ * 일봉 데이터를 주봉 또는 월봉으로 집계합니다.
+ * - 주봉: 월요일 시작 기준으로 그룹화
+ * - 월봉: YYYY-MM 기준으로 그룹화
+ * - 시가=그룹 첫 거래일, 종가=마지막 거래일, 고/저=그룹 내 최대/최소, 거래량=누적
+ */
 export function aggregateCandles(candles: Candle[], type: CandleType): Candle[] {
   if (type === 'daily' || candles.length === 0) return candles;
 

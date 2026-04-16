@@ -1,3 +1,19 @@
+/**
+ * AuthContext
+ *
+ * Supabase Auth 상태를 앱 전역에서 공유하는 Context입니다.
+ *
+ * 제공 값:
+ *   - user     : 현재 로그인한 Supabase User 객체 (비로그인 시 null)
+ *   - nickname : profiles 테이블에서 조회한 닉네임
+ *   - loading  : 초기 세션 확인 중 여부
+ *   - signInWithGoogle : Google OAuth 로그인 실행
+ *   - signOut  : 로그아웃 실행
+ *
+ * layout.tsx에서 AuthProvider로 감싸며,
+ * onAuthStateChange 리스너로 세션 변경을 실시간 추적합니다.
+ */
+
 'use client'
 
 import { createContext, useContext, useEffect, useState } from 'react'

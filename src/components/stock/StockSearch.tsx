@@ -1,3 +1,15 @@
+/**
+ * StockSearch
+ *
+ * 종목 검색 자동완성 컴포넌트입니다. AppHeader에서 사용합니다.
+ *
+ * 동작:
+ *   - 입력 500ms 디바운스 후 Supabase stocks 테이블에서 이름/코드 ILIKE 검색
+ *   - 키보드 네비게이션 (ArrowUp/Down, Enter, Escape) 지원
+ *   - 종목 선택 시 /stocks/[code]로 라우팅 + 스피너 표시
+ *   - 외부 클릭 시 드롭다운 닫힘
+ */
+
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';

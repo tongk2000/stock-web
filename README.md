@@ -11,7 +11,7 @@
 | 스타일링 | Tailwind CSS v4 + shadcn/ui |
 | 데이터 페칭 | TanStack Query v5 |
 | 백엔드/DB | Supabase (PostgreSQL + Auth + RLS) |
-| 차트 | TradingView Lightweight Charts (예정) |
+| 차트 | TradingView Lightweight Charts v5 |
 | 결제 | Stripe (예정) |
 | 배포 | Vercel (예정) |
 
@@ -19,47 +19,72 @@
 
 ```
 src/
-├── app/                        # Next.js App Router
-│   ├── layout.tsx              # 루트 레이아웃
-│   │                           #   ThemeProvider > FavoritesProvider > SidebarProvider
-│   │                           #   AppHeader (상단 고정) + LeftNav + {children}
-│   ├── page.tsx                # 홈 (검색 안내 페이지)
+├── app/                            # Next.js App Router
+│   ├── layout.tsx                  # 루트 레이아웃
+│   │                               #   ThemeProvider > AuthProvider > FavoritesProvider > SidebarProvider
+│   │                               #   AppHeader + LeftNav + {children}
+│   ├── page.tsx                    # 홈 (검색 안내 페이지)
+│   ├── auth/
+│   │   ├── callback/route.ts       # OAuth 콜백 (세션 교환 + 온보딩 분기)
+│   │   └── setup/page.tsx          # 닉네임 설정 (신규 가입 온보딩)
+│   ├── discussions/page.tsx        # 토론방 피드 (전체 최신글 50개)
 │   └── stocks/[code]/
-│       └── page.tsx            # 종목 상세 (차트 + 즐겨찾기)
+│       ├── page.tsx                # 종목 상세 (차트 + 즐겨찾기 + 토론방)
+│       └── loading.tsx             # 로딩 스켈레톤
 ├── components/
 │   ├── layout/
-│   │   ├── AppHeader.tsx       # 공통 상단 헤더 (햄버거·검색창·테마 토글)
-│   │   ├── LeftNav.tsx         # 왼쪽 사이드바 (네비·즐겨찾기·테마)
-│   │   └── query-provider.tsx  # TanStack Query 클라이언트 provider
-│   ├── chart/                  # 차트 관련 컴포넌트
+│   │   ├── AppHeader.tsx           # 공통 상단 헤더 (햄버거·검색창·로그인)
+│   │   ├── LeftNav.tsx             # 왼쪽 사이드바 (네비·즐겨찾기·테마)
+│   │   └── query-provider.tsx      # TanStack Query 클라이언트 provider
+│   ├── chart/
+│   │   └── CandleChart.tsx         # TradingView Lightweight Charts 래퍼
+│   ├── discussion/
+│   │   └── DiscussionSection.tsx   # 종목별 토론방 (실시간 구독)
 │   ├── stock/
-│   │   ├── StockSearch.tsx     # 종목 검색창 (AppHeader에서 재사용)
-│   │   ├── StockChartSection.tsx
-│   │   └── FavoriteButton.tsx  # 즐겨찾기 추가/해제 버튼
-│   └── ui/                     # shadcn/ui 컴포넌트
+│   │   ├── StockSearch.tsx         # 종목 검색 자동완성
+│   │   ├── StockChartSection.tsx   # 차트 영역 (가격·컨트롤·메모 모달)
+│   │   └── FavoriteButton.tsx      # 즐겨찾기 토글 버튼
+│   └── ui/                         # shadcn/ui 컴포넌트
 ├── contexts/
-│   ├── FavoritesContext.tsx    # 즐겨찾기 목록 (localStorage 기반)
-│   └── SidebarContext.tsx      # 사이드바 열림 상태 (AppHeader ↔ LeftNav 공유)
+│   ├── AuthContext.tsx             # Supabase Auth 전역 상태
+│   ├── FavoritesContext.tsx        # 즐겨찾기 (로그인: Supabase / 비로그인: localStorage)
+│   └── SidebarContext.tsx          # 사이드바 열림 상태 (AppHeader ↔ LeftNav 공유)
+├── hooks/
+│   ├── useIsDark.ts               # 다크모드 여부 (MutationObserver)
+│   └── useScrollAtTop.ts          # 스크롤 방향 기반 헤더 표시 제어
 ├── lib/
 │   ├── supabase/
-│   │   ├── client.ts           # 클라이언트 컴포넌트용 Supabase 클라이언트
-│   │   └── server.ts           # 서버 컴포넌트용 Supabase 클라이언트
-│   ├── query-client.ts         # TanStack Query 설정 (staleTime 5분)
-│   └── utils.ts
+│   │   ├── client.ts              # 클라이언트 컴포넌트용 Supabase 클라이언트
+│   │   └── server.ts              # 서버 컴포넌트용 Supabase 클라이언트
+│   ├── format.ts                  # 공통 포맷 유틸 (상대 시간 등)
+│   ├── indicators.ts              # 기술적 지표 계산 (MA, BB, RSI, OBV, 봉 집계)
+│   ├── query-client.ts            # TanStack Query 설정 (staleTime 5분)
+│   └── utils.ts                   # cn() 등 범용 유틸
 └── types/
-    ├── stock.ts                # Stock, Candle, CandleType 타입
-    └── discussion.ts           # Post, DiscussionRoom 타입
+    ├── stock.ts                   # Stock, Candle, CandleType
+    └── discussion.ts              # Post, DiscussionRoom
+
+stock-collector/                    # Python 데이터 수집 스크립트
+├── collect_candles.py              # 일봉 수집 (FinanceDataReader → Supabase)
+├── collect_financials.py           # 분기 재무 수집 (DART OpenAPI → Supabase)
+└── requirements.txt
 
 supabase/
-└── migrations/
-    └── 20260413000001_init_schema.sql  # 초기 DB 스키마
+└── migrations/                     # DB 마이그레이션 (순서대로 적용)
+    ├── 20260413000001_init_schema.sql       # 초기 스키마 + RLS
+    ├── 20260413000002_add_financials.sql    # 재무 정보 테이블
+    ├── 20260414000001_add_exchange_to_candles.sql  # 거래소(KRX/NXT) 컬럼
+    ├── 20260415000001_add_public_chart_notes.sql   # 차트 메모 프로토타입용 수정
+    ├── 20260416000001_add_onboarded.sql     # 온보딩 플래그
+    ├── 20260416000002_favorites_and_memo_fix.sql   # 즐겨찾기 테이블 + 메모 unique
+    └── 20260416000003_discussion_setup.sql  # 토론방 자동 생성 + 좋아요 + Realtime
 ```
 
 ## 레이아웃 구조
 
 ```
 ┌─────────────────────────────────────┐  ← AppHeader (h-14, sticky top-0)
-│  ☰  [종목 검색창]        [테마 토글]  │    모바일 ☰ → SidebarContext.toggle()
+│  ☰  [종목 검색창]     [프로필/로그인] │    모바일 ☰ → SidebarContext.toggle()
 ├──────────┬──────────────────────────┤
 │          │                          │
 │  LeftNav │  page content            │
@@ -71,6 +96,18 @@ supabase/
 데스크탑(sm+): LeftNav 항상 표시, ☰ 버튼 숨김
 ```
 
+## 인증 흐름
+
+```
+[로그인 버튼] → Google OAuth → /auth/callback
+  ├── 기존 유저 (onboarded=true)  → 원래 페이지로 리다이렉트
+  └── 신규 가입 (onboarded=false) → /auth/setup (닉네임 설정) → 홈
+```
+
+- Google OAuth를 통한 소셜 로그인
+- 가입 시 Supabase trigger로 profiles 자동 생성
+- 닉네임 설정 완료 후 서비스 이용 가능
+
 ## DB 스키마
 
 | 테이블 | 설명 |
@@ -80,8 +117,11 @@ supabase/
 | `candles` | 일봉/주봉/월봉 OHLCV 데이터 |
 | `discussion_rooms` | 공식방 + 프리미엄 유저 개설방, 태그 지원 |
 | `posts` | 토론방 게시글 (최대 1000자) |
+| `favorites` | 유저별 즐겨찾기 종목 (RLS: 본인만 접근) |
 | `chart_memos` | 날짜별 차트 메모 (무료 종목당 5개 제한은 앱 레벨 처리) |
+| `financials` | 분기별 재무 정보 (매출/영업이익/순이익/EPS 등) |
 | `price_predictions` | 가격 예측 + 만기 실제가 저장 (랭킹 재료) |
+| `post_likes` | 게시글 좋아요 (트리거로 posts.like_count 자동 동기화) |
 | `user_blocks` | 유저 차단 목록 |
 
 RLS(Row Level Security) 적용 완료. 주요 정책:
@@ -91,9 +131,10 @@ RLS(Row Level Security) 적용 완료. 주요 정책:
 
 ## 데이터 수집 전략
 
-- **캔들 데이터**: 매일 장 마감(15:30) 후 KIS API 배치 수집 → Supabase 저장
-- **토론방 현재가**: 실시간 WebSocket 대신 15~30초 폴링으로 처리 (인프라 단순화)
-- **실시간 기능**: 초기에는 미구현, 트래픽/니즈 증가 시 추가 예정
+- **캔들 데이터**: 평일 장 마감 후 GitHub Actions 스케줄로 FinanceDataReader 배치 수집 → Supabase 저장 (KRX/NXT 별도)
+- **재무 데이터**: DART OpenAPI로 최근 4분기 연결재무제표 수집 (수동 실행)
+- **토론방**: Supabase Realtime(postgres_changes) 구독으로 실시간 게시글 반영
+- **실시간 현재가**: 초기에는 미구현, 트래픽/니즈 증가 시 추가 예정
 
 ## 시작하기
 

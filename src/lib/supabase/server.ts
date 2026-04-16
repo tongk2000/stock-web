@@ -1,3 +1,11 @@
+/**
+ * 서버 컴포넌트 / Route Handler용 Supabase 클라이언트
+ *
+ * Next.js의 cookies()를 통해 요청별 세션을 읽고 쓸 수 있습니다.
+ * setAll의 try-catch는 서버 컴포넌트(읽기 전용)에서 쿠키 쓰기가
+ * 불가능한 경우를 무시하기 위한 것입니다.
+ */
+
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
 

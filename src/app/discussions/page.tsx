@@ -1,20 +1,16 @@
+/**
+ * 토론방 피드 페이지 (서버 컴포넌트)
+ *
+ * 모든 종목의 최근 게시글을 역순으로 50개까지 표시합니다.
+ * 각 게시글 카드를 클릭하면 해당 종목 상세 페이지(/stocks/[code])로 이동합니다.
+ */
+
 import Link from 'next/link';
 import { ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
+import { formatRelativeTime } from '@/lib/format';
 
 export const metadata = { title: '토론방' };
-
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '방금';
-  if (min < 60) return `${min}분 전`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}시간 전`;
-  const day = Math.floor(hour / 24);
-  if (day < 7) return `${day}일 전`;
-  return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-}
 
 export default async function DiscussionsPage() {
   const supabase = await createClient();

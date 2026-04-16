@@ -1,3 +1,29 @@
+/**
+ * CandleChart
+ *
+ * TradingView Lightweight Charts를 래핑한 캔들스틱 차트 컴포넌트입니다.
+ *
+ * 구조:
+ *   - Effect 1: 차트 인스턴스 생성 · 캔들/거래량/RSI/OBV 시리즈 세팅
+ *               패널 수나 테마가 바뀔 때만 재생성됨
+ *   - Effect 2: MA·BB 오버레이만 교체 (차트 재생성 없이 시리즈만 swap)
+ *
+ * 패널 높이:
+ *   각 서브 패널(거래량/RSI/OBV) 높이를 localStorage에 독립 저장하여
+ *   지표를 추가/제거해도 다른 패널 높이에 영향을 주지 않습니다.
+ *
+ * 모바일:
+ *   - 기본 패널 리사이즈 비활성화 → 500ms 롱프레스 드래그로 대체
+ *   - 핀치 줌 제스처를 직접 처리 (사파리 기본 동작 차단)
+ *
+ * Props:
+ *   - candles     : OHLCV 캔들 데이터 배열
+ *   - indicators  : 표시할 보조지표 옵션 (MA/BB/RSI/OBV/거래량/툴팁)
+ *   - isDark      : 다크모드 여부 (차트 테마 색상 결정)
+ *   - memos       : 날짜→메모 Map (툴팁에 메모 미리보기 표시)
+ *   - onDateClick : 캔들 클릭 시 날짜 콜백 (메모 모달 열기용)
+ */
+
 'use client';
 
 import {
