@@ -16,7 +16,7 @@ type PostWithAuthor = {
     nickname: string;
     score: number;
     is_premium: boolean;
-  } | null;
+  }[] | null;
 };
 
 interface Props {
@@ -208,14 +208,16 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
         </p>
       ) : (
         <div className="space-y-2">
-          {posts.map((post) => (
+          {posts.map((post) => {
+            const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+            return (
             <div key={post.id} className="rounded-xl border border-border bg-card/50 p-4">
               <div className="mb-2 flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-foreground">
-                    {post.profiles?.nickname ?? '알 수 없음'}
+                    {profile?.nickname ?? '알 수 없음'}
                   </span>
-                  {post.profiles?.is_premium && (
+                  {profile?.is_premium && (
                     <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
                       PRO
                     </span>
@@ -256,7 +258,8 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                 )}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
