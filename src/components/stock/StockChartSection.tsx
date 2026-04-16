@@ -127,11 +127,22 @@ export default function StockChartSection({ code }: Props) {
   const [initialized, setInitialized] = useState(false);
 
   // ── 메모 상태 ─────────────────────────────────────────────────────────────────
+  const [userId, setUserId] = useState<string | null>(null);
   const [memoRecord, setMemoRecord] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [memoInput, setMemoInput] = useState('');
 
   const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
+
+  // 로그인 유저 ID 확인
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
+      setUserId(session?.user?.id ?? null);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   // hydration 후 localStorage 복원 (SSR 불일치 방지)
   useEffect(() => {
@@ -139,23 +150,25 @@ export default function StockChartSection({ code }: Props) {
     setInitialized(true);
   }, []);
 
-  // 종목 변경 시 Supabase에서 메모 불러오기
+  // 종목/유저 변경 시 Supabase에서 메모 불러오기
   useEffect(() => {
     setMemoRecord({});
     setSelectedDate(null);
     setMemoInput('');
+    if (!userId) return;
     const supabase = createClient();
     supabase
       .from('chart_memos')
       .select('date, content')
       .eq('stock_code', code)
+      .eq('user_id', userId)
       .then(({ data }) => {
         if (!data) return;
         const record: Record<string, string> = {};
         for (const note of data) record[note.date] = note.content;
         setMemoRecord(record);
       });
-  }, [code]);
+  }, [code, userId]);
 
   // 초기화 완료 후에만 저장 (마운트 직후 DEFAULT로 덮어쓰는 버그 방지)
   useEffect(() => {
@@ -205,13 +218,14 @@ export default function StockChartSection({ code }: Props) {
 
   // ── 메모 핸들러 ───────────────────────────────────────────────────────────────
   const handleDateClick = useCallback((date: string) => {
+    if (!userId) return; // 비로그인 시 무시
     setMemoInput(memoRecord[date] ?? '');
     setSelectedDate(date);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memoRecord]);
+  }, [memoRecord, userId]);
 
   const saveMemo = useCallback(() => {
-    if (!selectedDate) return;
+    if (!selectedDate || !userId) return;
     const trimmed = memoInput.trim();
     // 낙관적 업데이트
     if (trimmed) {
@@ -225,23 +239,24 @@ export default function StockChartSection({ code }: Props) {
     const supabase = createClient();
     if (trimmed) {
       supabase.from('chart_memos').upsert(
-        { stock_code: code, date: selectedDate, content: trimmed },
-        { onConflict: 'stock_code,date' },
+        { user_id: userId, stock_code: code, date: selectedDate, content: trimmed },
+        { onConflict: 'user_id,stock_code,date' },
       ).then();
     } else {
       supabase.from('chart_memos').delete()
-        .eq('stock_code', code).eq('date', selectedDate).then();
+        .eq('user_id', userId).eq('stock_code', code).eq('date', selectedDate).then();
     }
-  }, [selectedDate, memoInput, code]);
+  }, [selectedDate, memoInput, code, userId]);
 
   const deleteMemo = useCallback((date: string) => {
+    if (!userId) return;
     setMemoRecord((prev) => { const { [date]: _, ...rest } = prev; return rest; });
     if (selectedDate === date) { setSelectedDate(null); setMemoInput(''); }
     // Supabase 동기화
     const supabase = createClient();
     supabase.from('chart_memos').delete()
-      .eq('stock_code', code).eq('date', date).then();
-  }, [selectedDate, code]);
+      .eq('user_id', userId).eq('stock_code', code).eq('date', date).then();
+  }, [selectedDate, code, userId]);
 
   function toggleMA(period: number) {
     setIndicators((prev) => ({
