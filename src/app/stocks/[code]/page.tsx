@@ -1,3 +1,17 @@
+/**
+ * 종목 상세 페이지 (서버 컴포넌트)
+ *
+ * URL: /stocks/[code]  (e.g. /stocks/005930)
+ *
+ * 서버에서 종목 정보와 공식 토론방 ID를 조회한 뒤,
+ * 클라이언트 컴포넌트(StockChartSection, DiscussionSection)에 전달합니다.
+ *
+ * 구성:
+ *   1. 종목 헤더 (이름 · 코드 · 시장 · 즐겨찾기 버튼)
+ *   2. StockChartSection (차트 + 보조지표 + 메모)
+ *   3. DiscussionSection (토론방, 공식방이 있는 경우만 표시)
+ */
+
 import { createClient } from '@/lib/supabase/server';
 import StockChartSection from '@/components/stock/StockChartSection';
 import { FavoriteButton } from '@/components/stock/FavoriteButton';

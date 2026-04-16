@@ -1,3 +1,15 @@
+/**
+ * 온보딩 — 닉네임 설정 페이지
+ *
+ * 신규 가입 시 /auth/callback에서 리다이렉트됩니다.
+ * 닉네임(2~20자)을 입력받아 profiles 테이블에 저장하고
+ * onboarded=true로 업데이트한 뒤 홈으로 이동합니다.
+ *
+ * 에러 처리:
+ *   - 닉네임 길이 검증 (2~20자)
+ *   - 중복 닉네임 (PostgreSQL unique violation: 23505)
+ */
+
 'use client'
 
 import { useState } from 'react'

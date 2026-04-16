@@ -1,3 +1,4 @@
+/** 홈페이지 — 상단 검색창으로 유도하는 랜딩 화면 */
 export default function Home() {
   return (
     <main className="flex flex-1 flex-col items-center justify-center bg-background px-4">

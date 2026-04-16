@@ -1,5 +1,19 @@
 """
-상장사 분기별 재무 정보 수집 (DART OpenAPI → Supabase)
+상장사 분기별 재무 정보 수집 스크립트 (DART OpenAPI → Supabase)
+
+최근 4분기의 연결재무제표에서 매출액·영업이익·당기순이익을 추출하여
+financials 테이블에 저장합니다.
+
+흐름:
+  1. DART 상장사 목록(corpCode.xml) 다운로드
+  2. 최근 4분기 대상 분기 계산
+  3. 각 기업별·분기별 재무제표 조회 (fnlttSinglAcnt API)
+  4. 매출/영업이익/순이익/영업이익률 파싱 후 upsert
+
+환경 변수:
+  - SUPABASE_URL              : Supabase 프로젝트 URL
+  - SUPABASE_SERVICE_ROLE_KEY  : service_role 키
+  - DART_API_KEY               : DART OpenAPI 인증키
 """
 
 import os
@@ -24,7 +38,7 @@ REPRT_CODE_MAP = {1: "11013", 2: "11012", 3: "11014", 4: "11011"}
 
 
 def get_corp_list():
-    """DART 상장사 목록 (고유번호 → 종목코드 매핑)"""
+    """DART 상장사 목록 다운로드 (고유번호 → 종목코드 매핑). ZIP → XML 파싱."""
     import zipfile
     import xml.etree.ElementTree as ET
     import io
@@ -67,7 +81,7 @@ def get_financial_data(corp_code: str, year: int, quarter: int):
 
 
 def extract_amount(items: list, account_names: list):
-    """계정과목명으로 금액 추출 (첫 번째 매칭)"""
+    """계정과목명 목록 중 첫 매칭 항목의 당기 금액(thstrm_amount)을 정수로 반환"""
     for item in items:
         if item.get("account_nm") in account_names:
             val = item.get("thstrm_amount", "").replace(",", "").strip()
@@ -79,7 +93,7 @@ def extract_amount(items: list, account_names: list):
 
 
 def parse_financials(stock_code: str, year: int, quarter: int, items: list):
-    """재무제표 항목 파싱"""
+    """재무제표 raw 항목에서 매출/영업이익/순이익/영업이익률을 추출하여 dict로 반환"""
     revenue = extract_amount(items, ["매출액", "수익(매출액)"])
     operating_profit = extract_amount(items, ["영업이익", "영업이익(손실)"])
     net_income = extract_amount(items, ["당기순이익", "당기순이익(손실)"])

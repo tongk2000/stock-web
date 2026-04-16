@@ -1,3 +1,11 @@
+/**
+ * FavoriteButton
+ *
+ * 종목 즐겨찾기 추가/해제 토글 버튼입니다.
+ * 종목 상세 페이지 헤더에서 종목명 옆에 표시됩니다.
+ * FavoritesContext를 통해 즐겨찾기 상태를 전역 관리합니다.
+ */
+
 'use client';
 
 import { Star } from 'lucide-react';

@@ -1,7 +1,18 @@
 """
-상장사 일봉 수집 (FinanceDataReader → Supabase)
-- 증분 업데이트: DB의 마지막 날짜 이후만 수집
-- KRX / NXT 별도 저장
+상장사 일봉 수집 스크립트 (FinanceDataReader → Supabase)
+
+GitHub Actions 스케줄(평일 16:00 KST)로 실행되며,
+KOSPI·KOSDAQ 전 종목의 일봉 데이터를 증분 수집합니다.
+
+흐름:
+  1. 거래소(KRX/NXT)별 마지막 저장 날짜 조회
+  2. 상장사 목록 가져와 stocks 테이블 upsert
+  3. 각 종목의 미수집 기간 일봉을 FinanceDataReader로 조회
+  4. candles 테이블에 upsert (중복 시 덮어쓰기)
+
+환경 변수:
+  - SUPABASE_URL             : Supabase 프로젝트 URL
+  - SUPABASE_SERVICE_ROLE_KEY : service_role 키 (RLS 우회)
 """
 
 import os
