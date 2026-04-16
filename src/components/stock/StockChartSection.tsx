@@ -292,62 +292,61 @@ export default function StockChartSection({ code }: Props) {
       <div className="rounded-xl border border-border bg-card/50 p-1 sm:p-4">
         {/* 컨트롤 바 */}
         <div className="mb-3 flex flex-col gap-2">
-          {/* 상단 탭 및 설정 토글 버튼 */}
+          {/* 1행: 거래소 탭 + 지표 설정 버튼 */}
           <div className="flex items-center justify-between">
-            <div className="flex flex-wrap gap-2">
-              <div className="flex gap-1">
-                {EXCHANGES.map((ex) => {
-                  const isNxt = ex === 'NXT';
-                  return (
-                    <button
-                      key={ex}
-                      type="button"
-                      onClick={() => !isNxt && setExchange(ex)}
-                      disabled={isNxt}
-                      className={cn(
-                        'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                        exchange === ex && !isNxt
-                          ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
-                          : isNxt
-                            ? 'cursor-not-allowed text-muted-foreground/40'
-                            : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
-                      )}
-                    >
-                      {ex}
-                      {isNxt && <span className="ml-1.5 text-xs opacity-50">준비 중</span>}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="h-4 w-px self-center bg-border" />
-              <div className="flex gap-1">
-                {CANDLE_TYPES.map((ct) => (
+            <div className="flex gap-1">
+              {EXCHANGES.map((ex) => {
+                const isNxt = ex === 'NXT';
+                return (
                   <button
-                    key={ct.value}
+                    key={ex}
                     type="button"
-                    onClick={() => setCandleType(ct.value)}
+                    onClick={() => !isNxt && setExchange(ex)}
+                    disabled={isNxt}
                     className={cn(
                       'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
-                      candleType === ct.value
+                      exchange === ex && !isNxt
                         ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
-                        : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                        : isNxt
+                          ? 'cursor-not-allowed text-muted-foreground/40'
+                          : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                     )}
                   >
-                    {ct.label}
+                    {ex}
+                    {isNxt && <span className="ml-1.5 text-xs opacity-50">준비 중</span>}
                   </button>
-                ))}
-              </div>
+                );
+              })}
             </div>
-            
+
             <button
               type="button"
               onClick={() => setShowIndicators(!showIndicators)}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             >
               <SlidersHorizontal size={14} />
-              <span className="hidden sm:inline">지표 설정</span>
+              <span>지표 설정</span>
               {showIndicators ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
             </button>
+          </div>
+
+          {/* 2행: 봉 타입 탭 */}
+          <div className="flex gap-1">
+            {CANDLE_TYPES.map((ct) => (
+              <button
+                key={ct.value}
+                type="button"
+                onClick={() => setCandleType(ct.value)}
+                className={cn(
+                  'rounded-lg px-3 py-1.5 text-sm font-medium transition-colors',
+                  candleType === ct.value
+                    ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
+                    : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
+                )}
+              >
+                {ct.label}
+              </button>
+            ))}
           </div>
 
           {/* 보조지표 설정 영역 */}
