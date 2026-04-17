@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Trash2, CornerDownRight } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -188,19 +188,16 @@ export default function CommentSection({ postId }: Props) {
                   onDelete={() => handleDelete(c.id)}
                 />
                 {replies.length > 0 && (
-                  <ul className="mt-2 space-y-2 pl-6">
+                  <ul className="ml-4 mt-2 space-y-2 border-l-2 border-border pl-3">
                     {replies.map((r) => (
-                      <li key={r.id} className="flex gap-1.5">
-                        <CornerDownRight size={14} className="mt-1 shrink-0 text-muted-foreground" />
-                        <div className="flex-1">
-                          <CommentItem
-                            comment={r}
-                            canDelete={user?.id === r.user_id}
-                            canReply={!!user}
-                            onReply={() => startReply(r)}
-                            onDelete={() => handleDelete(r.id)}
-                          />
-                        </div>
+                      <li key={r.id}>
+                        <CommentItem
+                          comment={r}
+                          canDelete={user?.id === r.user_id}
+                          canReply={!!user}
+                          onReply={() => startReply(r)}
+                          onDelete={() => handleDelete(r.id)}
+                        />
                       </li>
                     ))}
                   </ul>
