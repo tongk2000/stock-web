@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { ThumbsUp, Trash2 } from 'lucide-react';
+import { ThumbsUp, Trash2, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import CommentSection from './CommentSection';
 
 type PostWithAuthor = {
   id: string;
   content: string;
   created_at: string;
   like_count: number;
+  comment_count: number;
   user_id: string;
   profiles: {
     nickname: string;
@@ -45,7 +47,17 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
+  const [openComments, setOpenComments] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const toggleComments = useCallback((postId: string) => {
+    setOpenComments((prev) => {
+      const next = new Set(prev);
+      if (next.has(postId)) next.delete(postId);
+      else next.add(postId);
+      return next;
+    });
+  }, []);
 
   // 게시글 목록 조회
   useEffect(() => {
@@ -53,7 +65,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
     const supabase = createClient();
     supabase
       .from('posts')
-      .select('id, content, created_at, like_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
+      .select('id, content, created_at, like_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
       .eq('room_id', roomId)
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE)
@@ -87,7 +99,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
         async (payload) => {
           const { data } = await supabase
             .from('posts')
-            .select('id, content, created_at, like_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
+            .select('id, content, created_at, like_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
             .eq('id', payload.new.id)
             .single();
           if (data) setPosts((prev) => [data as PostWithAuthor, ...prev]);
@@ -99,7 +111,9 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
         (payload) => {
           setPosts((prev) =>
             prev.map((p) =>
-              p.id === payload.new.id ? { ...p, like_count: payload.new.like_count } : p,
+              p.id === payload.new.id
+                ? { ...p, like_count: payload.new.like_count, comment_count: payload.new.comment_count }
+                : p,
             ),
           );
         },
@@ -247,6 +261,19 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                   <span>{post.like_count}</span>
                 </button>
 
+                <button
+                  onClick={() => toggleComments(post.id)}
+                  className={cn(
+                    'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
+                    openComments.has(post.id)
+                      ? 'bg-accent text-foreground'
+                      : 'text-muted-foreground hover:bg-accent hover:text-foreground',
+                  )}
+                >
+                  <MessageSquare size={12} />
+                  <span>{post.comment_count}</span>
+                </button>
+
                 {user?.id === post.user_id && (
                   <button
                     onClick={() => handleDelete(post.id)}
@@ -257,6 +284,10 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                   </button>
                 )}
               </div>
+
+              {openComments.has(post.id) && (
+                <CommentSection postId={post.id} />
+              )}
             </div>
             );
           })}

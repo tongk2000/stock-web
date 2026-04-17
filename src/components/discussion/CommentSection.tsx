@@ -1,0 +1,331 @@
+'use client';
+
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Trash2, CornerDownRight } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
+
+type CommentRow = {
+  id: string;
+  post_id: string;
+  parent_id: string | null;
+  user_id: string;
+  reply_to_user_id: string | null;
+  content: string;
+  created_at: string;
+  profiles: { nickname: string; is_premium: boolean }[] | { nickname: string; is_premium: boolean } | null;
+  reply_to: { nickname: string }[] | { nickname: string } | null;
+};
+
+type Comment = {
+  id: string;
+  post_id: string;
+  parent_id: string | null;
+  user_id: string;
+  reply_to_user_id: string | null;
+  reply_to_nickname: string | null;
+  content: string;
+  created_at: string;
+  nickname: string;
+  is_premium: boolean;
+};
+
+interface Props {
+  postId: string;
+}
+
+const SELECT_COLS =
+  'id, post_id, parent_id, user_id, reply_to_user_id, content, created_at, ' +
+  'profiles!comments_user_id_fkey(nickname, is_premium), ' +
+  'reply_to:profiles!comments_reply_to_user_id_fkey(nickname)';
+
+function firstOrNull<T>(v: T[] | T | null | undefined): T | null {
+  if (!v) return null;
+  return Array.isArray(v) ? (v[0] ?? null) : v;
+}
+
+function normalize(row: CommentRow): Comment {
+  const p = firstOrNull(row.profiles);
+  const r = firstOrNull(row.reply_to);
+  return {
+    id: row.id,
+    post_id: row.post_id,
+    parent_id: row.parent_id,
+    user_id: row.user_id,
+    reply_to_user_id: row.reply_to_user_id,
+    reply_to_nickname: r?.nickname ?? null,
+    content: row.content,
+    created_at: row.created_at,
+    nickname: p?.nickname ?? '알 수 없음',
+    is_premium: p?.is_premium ?? false,
+  };
+}
+
+function formatRelativeTime(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return '방금';
+  if (min < 60) return `${min}분 전`;
+  const hour = Math.floor(min / 60);
+  if (hour < 24) return `${hour}시간 전`;
+  const day = Math.floor(hour / 24);
+  if (day < 7) return `${day}일 전`;
+  return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
+}
+
+export default function CommentSection({ postId }: Props) {
+  const { user } = useAuth();
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [content, setContent] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [replyTarget, setReplyTarget] = useState<Comment | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    setLoading(true);
+    const supabase = createClient();
+    supabase
+      .from('comments')
+      .select(SELECT_COLS)
+      .eq('post_id', postId)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        setComments(((data as CommentRow[]) ?? []).map(normalize));
+        setLoading(false);
+      });
+  }, [postId]);
+
+  useEffect(() => {
+    const supabase = createClient();
+    const channel = supabase
+      .channel(`comments:${postId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'comments', filter: `post_id=eq.${postId}` },
+        async (payload) => {
+          const { data } = await supabase
+            .from('comments')
+            .select(SELECT_COLS)
+            .eq('id', payload.new.id)
+            .single();
+          if (!data) return;
+          const next = normalize(data as CommentRow);
+          setComments((prev) => (prev.some((c) => c.id === next.id) ? prev : [...prev, next]));
+        },
+      )
+      .on(
+        'postgres_changes',
+        { event: 'DELETE', schema: 'public', table: 'comments' },
+        (payload) => {
+          setComments((prev) => prev.filter((c) => c.id !== payload.old.id));
+        },
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [postId]);
+
+  const handleSubmit = useCallback(async () => {
+    if (!user || !content.trim() || submitting) return;
+    setSubmitting(true);
+
+    // 대댓글은 모두 최상위 댓글의 자식으로 평탄화
+    const parentId = replyTarget
+      ? (replyTarget.parent_id ?? replyTarget.id)
+      : null;
+    const replyToUserId = replyTarget && replyTarget.parent_id
+      ? replyTarget.user_id
+      : null;
+
+    const supabase = createClient();
+    await supabase.from('comments').insert({
+      post_id: postId,
+      parent_id: parentId,
+      user_id: user.id,
+      reply_to_user_id: replyToUserId,
+      content: content.trim(),
+    });
+    setContent('');
+    setReplyTarget(null);
+    setSubmitting(false);
+  }, [user, content, submitting, postId, replyTarget]);
+
+  const handleDelete = useCallback(async (commentId: string) => {
+    if (!user) return;
+    setComments((prev) => prev.filter((c) => c.id !== commentId));
+    const supabase = createClient();
+    await supabase.from('comments').delete().eq('id', commentId).eq('user_id', user.id);
+  }, [user]);
+
+  const startReply = useCallback((target: Comment) => {
+    setReplyTarget(target);
+    setTimeout(() => textareaRef.current?.focus(), 0);
+  }, []);
+
+  const topLevel = comments.filter((c) => c.parent_id === null);
+  const repliesByParent = new Map<string, Comment[]>();
+  for (const c of comments) {
+    if (c.parent_id) {
+      const list = repliesByParent.get(c.parent_id) ?? [];
+      list.push(c);
+      repliesByParent.set(c.parent_id, list);
+    }
+  }
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      {loading ? (
+        <div className="space-y-2">
+          {[0, 1].map((i) => (
+            <div key={i} className="h-12 animate-pulse rounded-lg bg-muted" />
+          ))}
+        </div>
+      ) : topLevel.length === 0 ? (
+        <p className="py-2 text-center text-xs text-muted-foreground">
+          첫 댓글을 남겨보세요.
+        </p>
+      ) : (
+        <ul className="space-y-3">
+          {topLevel.map((c) => {
+            const replies = repliesByParent.get(c.id) ?? [];
+            return (
+              <li key={c.id}>
+                <CommentItem
+                  comment={c}
+                  canDelete={user?.id === c.user_id}
+                  canReply={!!user}
+                  onReply={() => startReply(c)}
+                  onDelete={() => handleDelete(c.id)}
+                />
+                {replies.length > 0 && (
+                  <ul className="mt-2 space-y-2 pl-6">
+                    {replies.map((r) => (
+                      <li key={r.id} className="flex gap-1.5">
+                        <CornerDownRight size={14} className="mt-1 shrink-0 text-muted-foreground" />
+                        <div className="flex-1">
+                          <CommentItem
+                            comment={r}
+                            canDelete={user?.id === r.user_id}
+                            canReply={!!user}
+                            onReply={() => startReply(r)}
+                            onDelete={() => handleDelete(r.id)}
+                          />
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      {/* 입력 */}
+      {user ? (
+        <div className="mt-3">
+          {replyTarget && (
+            <div className="mb-1.5 flex items-center justify-between rounded-md bg-accent/50 px-2.5 py-1.5 text-xs text-muted-foreground">
+              <span>
+                <span className="font-medium text-foreground">@{replyTarget.nickname}</span>
+                님에게 답글
+              </span>
+              <button
+                onClick={() => setReplyTarget(null)}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                취소
+              </button>
+            </div>
+          )}
+          <div className="flex gap-2">
+            <textarea
+              ref={textareaRef}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
+              }}
+              placeholder={replyTarget ? '답글을 입력하세요' : '댓글을 입력하세요'}
+              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+              rows={2}
+              maxLength={500}
+            />
+            <button
+              onClick={handleSubmit}
+              disabled={!content.trim() || submitting}
+              className="self-end rounded-lg bg-violet-500/20 px-3 py-1.5 text-xs font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? '등록 중' : '등록'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-muted-foreground">
+          로그인 후 댓글을 작성할 수 있습니다.
+        </p>
+      )}
+    </div>
+  );
+}
+
+function CommentItem({
+  comment,
+  canDelete,
+  canReply,
+  onReply,
+  onDelete,
+}: {
+  comment: Comment;
+  canDelete: boolean;
+  canReply: boolean;
+  onReply: () => void;
+  onDelete: () => void;
+}) {
+  return (
+    <div>
+      <div className="flex items-center gap-1.5">
+        <span className="text-xs font-medium text-foreground">{comment.nickname}</span>
+        {comment.is_premium && (
+          <span className="rounded bg-amber-500/20 px-1 py-[1px] text-[9px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
+            PRO
+          </span>
+        )}
+        <span className="text-[11px] text-muted-foreground">
+          {formatRelativeTime(comment.created_at)}
+        </span>
+      </div>
+      <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
+        {comment.reply_to_nickname && (
+          <span className="mr-1 font-medium text-violet-400">
+            @{comment.reply_to_nickname}
+          </span>
+        )}
+        {comment.content}
+      </p>
+      <div className="mt-1 flex items-center gap-1">
+        {canReply && (
+          <button
+            onClick={onReply}
+            className={cn(
+              'rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground',
+              'transition-colors hover:bg-accent hover:text-foreground',
+            )}
+          >
+            답글
+          </button>
+        )}
+        {canDelete && (
+          <button
+            onClick={onDelete}
+            className="ml-auto rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+            aria-label="삭제"
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
