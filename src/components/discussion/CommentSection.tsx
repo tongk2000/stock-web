@@ -5,6 +5,7 @@ import { Trash2, CornerDownRight } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
+import { formatRelativeTime } from '@/lib/format';
 
 type CommentRow = {
   id: string;
@@ -62,18 +63,6 @@ function normalize(row: CommentRow): Comment {
   };
 }
 
-function formatRelativeTime(dateStr: string): string {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return '방금';
-  if (min < 60) return `${min}분 전`;
-  const hour = Math.floor(min / 60);
-  if (hour < 24) return `${hour}시간 전`;
-  const day = Math.floor(hour / 24);
-  if (day < 7) return `${day}일 전`;
-  return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
-}
-
 export default function CommentSection({ postId }: Props) {
   const { user } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
@@ -92,7 +81,7 @@ export default function CommentSection({ postId }: Props) {
       .eq('post_id', postId)
       .order('created_at', { ascending: true })
       .then(({ data }) => {
-        setComments(((data as CommentRow[]) ?? []).map(normalize));
+        setComments(((data as unknown as CommentRow[]) ?? []).map(normalize));
         setLoading(false);
       });
   }, [postId]);
@@ -111,7 +100,7 @@ export default function CommentSection({ postId }: Props) {
             .eq('id', payload.new.id)
             .single();
           if (!data) return;
-          const next = normalize(data as CommentRow);
+          const next = normalize(data as unknown as CommentRow);
           setComments((prev) => (prev.some((c) => c.id === next.id) ? prev : [...prev, next]));
         },
       )
