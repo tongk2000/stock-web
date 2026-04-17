@@ -175,7 +175,7 @@ export default function CommentSection({ postId }: Props) {
           첫 댓글을 남겨보세요.
         </p>
       ) : (
-        <ul className="space-y-3">
+        <ul className="space-y-3 pl-2">
           {topLevel.map((c) => {
             const replies = repliesByParent.get(c.id) ?? [];
             return (
@@ -188,7 +188,7 @@ export default function CommentSection({ postId }: Props) {
                   onDelete={() => handleDelete(c.id)}
                 />
                 {replies.length > 0 && (
-                  <ul className="ml-4 mt-2 space-y-2 border-l-2 border-border pl-3">
+                  <ul className="ml-4 mt-2 space-y-2 border-l border-muted-foreground/25 pl-3">
                     {replies.map((r) => (
                       <li key={r.id}>
                         <CommentItem
