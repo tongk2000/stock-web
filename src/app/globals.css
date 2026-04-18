@@ -126,6 +126,13 @@
   html {
     @apply font-sans;
   }
+
+  /* iOS Safari auto-zoom prevention: font-size < 16px triggers zoom on focus */
+  @supports (-webkit-touch-callout: none) {
+    input, textarea, select {
+      font-size: max(16px, 1em);
+    }
+  }
 }
 
 /* 차트 패널 구분선 두께 조절 (기본 1px -> 2px) */
