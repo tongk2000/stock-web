@@ -11,9 +11,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import CommentSection from '@/components/discussion/CommentSection';
+import PostLikeButtons from '@/components/discussion/PostLikeButtons';
 import { formatRelativeTime } from '@/lib/format';
 
 // 좋아요 또는 댓글이 이 값 이상이어야 검색엔진 색인 허용
@@ -31,6 +31,7 @@ type PostRow = {
   dislike_count: number;
   comment_count: number;
   stock_code: string;
+  user_id: string;
   profiles:
     | { nickname: string; is_premium: boolean }
     | { nickname: string; is_premium: boolean }[]
@@ -47,7 +48,7 @@ async function fetchPostWithStock(id: string) {
   const { data: post } = await supabase
     .from('posts')
     .select(
-      'id, content, created_at, like_count, dislike_count, comment_count, stock_code, ' +
+      'id, content, created_at, like_count, dislike_count, comment_count, stock_code, user_id, ' +
         'profiles!posts_user_id_fkey(nickname, is_premium)',
     )
     .eq('id', id)
@@ -142,26 +143,13 @@ export default async function PostDetailPage({ params }: Props) {
             {post.content}
           </p>
 
-          <div className="mt-4 flex items-center gap-3 border-t border-border pt-3 text-xs text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <ThumbsUp size={12} />
-              {post.like_count}
-            </span>
-            <span className="flex items-center gap-1">
-              <ThumbsDown size={12} />
-              {post.dislike_count}
-            </span>
-            <span className="flex items-center gap-1">
-              <MessageSquare size={12} />
-              {post.comment_count}
-            </span>
-            <Link
-              href={`/stocks/${post.stock_code}`}
-              className="ml-auto rounded-md bg-violet-500/20 px-2.5 py-1 text-[11px] font-medium text-violet-400 ring-1 ring-violet-500/30 hover:bg-violet-500/30"
-            >
-              토론방에서 좋아요 →
-            </Link>
-          </div>
+          <PostLikeButtons
+            postId={post.id}
+            authorId={post.user_id}
+            initialLikes={post.like_count}
+            initialDislikes={post.dislike_count}
+            initialComments={post.comment_count}
+          />
 
           <CommentSection postId={post.id} />
         </article>

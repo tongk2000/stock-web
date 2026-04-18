@@ -128,13 +128,24 @@ export default function CommentSection({ postId }: Props) {
       : null;
 
     const supabase = createClient();
-    await supabase.from('comments').insert({
-      post_id: postId,
-      parent_id: parentId,
-      user_id: user.id,
-      reply_to_user_id: replyToUserId,
-      content: content.trim(),
-    });
+    // 삽입된 행을 조인과 함께 되돌려받아 즉시 목록에 반영 (realtime INSERT 핸들러는 id로 dedup).
+    const { data: inserted } = await supabase
+      .from('comments')
+      .insert({
+        post_id: postId,
+        parent_id: parentId,
+        user_id: user.id,
+        reply_to_user_id: replyToUserId,
+        content: content.trim(),
+      })
+      .select(SELECT_COLS)
+      .single();
+
+    if (inserted) {
+      const next = normalize(inserted as unknown as CommentRow);
+      setComments((prev) => (prev.some((c) => c.id === next.id) ? prev : [...prev, next]));
+    }
+
     setContent('');
     setReplyTarget(null);
     setSubmitting(false);
