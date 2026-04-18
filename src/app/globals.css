@@ -126,12 +126,12 @@
   html {
     @apply font-sans;
   }
+}
 
-  /* iOS Safari auto-zoom prevention: font-size < 16px triggers zoom on focus */
-  @supports (-webkit-touch-callout: none) {
-    input, textarea, select {
-      font-size: max(16px, 1em);
-    }
+/* iOS Safari auto-zoom prevention (must be outside @layer to override utility classes) */
+@supports (-webkit-touch-callout: none) {
+  input, textarea, select {
+    font-size: max(16px, 1em) !important;
   }
 }
 
