@@ -24,10 +24,14 @@ src/
 │   │                               #   ThemeProvider > AuthProvider > FavoritesProvider > SidebarProvider
 │   │                               #   AppHeader + LeftNav + {children}
 │   ├── page.tsx                    # 홈 (검색 안내 페이지)
+│   ├── sitemap.ts                  # 동적 sitemap.xml (종목 + 참여도 높은 토론글)
+│   ├── robots.ts                   # robots.txt (+ sitemap 참조, /auth 차단)
 │   ├── auth/
 │   │   ├── callback/route.ts       # OAuth 콜백 (세션 교환 + 온보딩 분기)
 │   │   └── setup/page.tsx          # 닉네임 설정 (신규 가입 온보딩)
-│   ├── discussions/page.tsx        # 토론방 피드 (전체 최신글 50개)
+│   ├── discussions/
+│   │   ├── page.tsx                # 토론방 피드 (전체 최신글, 무한 스크롤)
+│   │   └── [id]/page.tsx           # 토론글 상세 (SSR, SEO용 영속 링크)
 │   └── stocks/[code]/
 │       ├── page.tsx                # 종목 상세 (차트 + 즐겨찾기 + 토론방)
 │       └── loading.tsx             # 로딩 스켈레톤
@@ -181,3 +185,14 @@ npm run dev
 |---|---|---|
 | 무료 | 0원 | 차트 메모 종목당 5개, 토론방 개설 불가 |
 | 프리미엄 | 월 $1 / 연 $10 | 메모 무제한, 토론방 개설 가능 |
+
+## SEO
+
+검색엔진 색인/노출을 위한 구조:
+
+- **개별 토론글 영속 URL** — `/discussions/[id]` SSR 라우트. 피드 카드 클릭 시 이 페이지로 이동하여 딥 링크·공유·색인이 가능합니다.
+- **조건부 색인** — `generateMetadata`에서 좋아요 또는 댓글 수가 `ENGAGEMENT_THRESHOLD`(기본 3) 이상인 글만 `index: true`. 그 외는 `noindex, follow` 처리해 저품질·스팸 글이 도메인 평판을 떨어뜨리지 않도록 합니다.
+- **`app/sitemap.ts`** — 홈·토론방 목록 + 전체 종목(`/stocks/[code]`) + 참여도 임계값 이상의 토론글을 포함하는 동적 sitemap.
+- **`app/robots.ts`** — `/auth/` 차단, sitemap 참조, `host` 지정.
+- **canonical / OpenGraph** — 상세 페이지에서 절대 경로 canonical과 `og:type=article`, `publishedTime` 메타를 제공합니다.
+- **`NEXT_PUBLIC_SITE_URL`** — sitemap·robots·canonical이 사용할 절대 URL. 배포 환경변수에 반드시 설정하세요 (예: `https://example.com`).
