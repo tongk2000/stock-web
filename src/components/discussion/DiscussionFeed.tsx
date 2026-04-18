@@ -5,12 +5,12 @@
  *
  * 모든 종목의 최근 토론 게시글 피드 + 검색 컴포넌트.
  *
- * - 검색어가 비어 있으면 최신순 50개를 보여줍니다.
- * - 검색어 입력 시 300ms 디바운스 후 content ILIKE 매칭으로 재조회합니다.
+ * - 최신순으로 한 페이지(PAGE_SIZE)씩 불러오고, 스크롤이 끝에 닿으면 다음 페이지를 이어 붙입니다.
+ * - 검색어 입력 시 300ms 디바운스 후 content ILIKE 매칭으로 재조회(커서 초기화)합니다.
  * - 카드 클릭 시 해당 종목 상세 페이지(/stocks/[code])로 이동합니다.
  */
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Search, ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
@@ -27,7 +27,7 @@ type Post = {
 
 type ProfileInfo = { nickname: string; is_premium: boolean };
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 20;
 
 export default function DiscussionFeed() {
   const [query, setQuery] = useState('');
@@ -36,33 +36,32 @@ export default function DiscussionFeed() {
   const [stockMap, setStockMap] = useState<Map<string, string>>(new Map());
   const [profileMap, setProfileMap] = useState<Map<string, ProfileInfo>>(new Map());
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const t = setTimeout(() => setDebounced(query.trim()), 300);
     return () => clearTimeout(t);
   }, [query]);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const supabase = createClient();
-
-    (async () => {
+  // 한 페이지 조회 (cursor = 마지막으로 본 게시글의 created_at, 없으면 첫 페이지)
+  const fetchPage = useCallback(
+    async (cursor: string | null) => {
+      const supabase = createClient();
       let q = supabase
         .from('posts')
         .select('id, content, created_at, like_count, stock_code, user_id')
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
+      if (cursor) q = q.lt('created_at', cursor);
       if (debounced) {
-        // content LIKE 매칭 — 특수문자 이스케이프 (%, _, \)
         const escaped = debounced.replace(/([\\%_])/g, '\\$1');
         q = q.ilike('content', `%${escaped}%`);
       }
 
       const { data: postsData } = await q;
-      if (cancelled) return;
-
-      const list = postsData ?? [];
+      const list = (postsData ?? []) as Post[];
       const stockCodes = [...new Set(list.map((p) => p.stock_code))];
       const userIds = [...new Set(list.map((p) => p.user_id))];
 
@@ -75,19 +74,75 @@ export default function DiscussionFeed() {
           : Promise.resolve({ data: [] as { id: string; nickname: string; is_premium: boolean }[] }),
       ]);
 
+      return {
+        list,
+        stocks: stocksRes.data ?? [],
+        profiles: profilesRes.data ?? [],
+      };
+    },
+    [debounced],
+  );
+
+  // 검색어 변경 시 처음부터 다시 로드
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setPosts([]);
+    setHasMore(true);
+    (async () => {
+      const { list, stocks, profiles } = await fetchPage(null);
       if (cancelled) return;
       setPosts(list);
-      setStockMap(new Map((stocksRes.data ?? []).map((s) => [s.code, s.name])));
+      setStockMap(new Map(stocks.map((s) => [s.code, s.name])));
       setProfileMap(
-        new Map((profilesRes.data ?? []).map((p) => [p.id, { nickname: p.nickname, is_premium: p.is_premium }])),
+        new Map(profiles.map((p) => [p.id, { nickname: p.nickname, is_premium: p.is_premium }])),
       );
+      setHasMore(list.length === PAGE_SIZE);
       setLoading(false);
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [debounced]);
+  }, [fetchPage]);
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return;
+    const lastPost = posts[posts.length - 1];
+    if (!lastPost) return;
+    setLoadingMore(true);
+    const { list, stocks, profiles } = await fetchPage(lastPost.created_at);
+    setPosts((prev) => {
+      const seen = new Set(prev.map((p) => p.id));
+      const next = list.filter((p) => !seen.has(p.id));
+      return [...prev, ...next];
+    });
+    setStockMap((prev) => {
+      const next = new Map(prev);
+      stocks.forEach((s) => next.set(s.code, s.name));
+      return next;
+    });
+    setProfileMap((prev) => {
+      const next = new Map(prev);
+      profiles.forEach((p) => next.set(p.id, { nickname: p.nickname, is_premium: p.is_premium }));
+      return next;
+    });
+    setHasMore(list.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, loading, posts, fetchPage]);
+
+  // 끝에 닿으면 다음 페이지 로드
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   return (
     <div>
@@ -158,6 +213,15 @@ export default function DiscussionFeed() {
               </Link>
             );
           })}
+
+          {/* 무한 스크롤 센티넬 */}
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-4">
+              {loadingMore && (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

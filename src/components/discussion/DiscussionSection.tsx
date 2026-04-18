@@ -30,16 +30,22 @@ interface Props {
 
 const PAGE_SIZE = 30;
 
+const POST_SELECT =
+  'id, content, created_at, like_count, dislike_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)';
+
 export default function DiscussionSection({ roomId, stockCode }: Props) {
   const { user } = useAuth();
   const [posts, setPosts] = useState<PostWithAuthor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [content, setContent] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [likedSet, setLikedSet] = useState<Set<string>>(new Set());
   const [dislikedSet, setDislikedSet] = useState<Set<string>>(new Set());
   const [openComments, setOpenComments] = useState<Set<string>>(new Set());
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   const toggleComments = useCallback((postId: string) => {
     setOpenComments((prev) => {
@@ -50,21 +56,67 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
     });
   }, []);
 
-  // 게시글 목록 조회
+  // 게시글 목록 조회 (첫 페이지)
   useEffect(() => {
+    let cancelled = false;
     setLoading(true);
+    setPosts([]);
+    setHasMore(true);
     const supabase = createClient();
     supabase
       .from('posts')
-      .select('id, content, created_at, like_count, dislike_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
+      .select(POST_SELECT)
       .eq('room_id', roomId)
       .order('created_at', { ascending: false })
       .limit(PAGE_SIZE)
       .then(({ data }) => {
-        setPosts((data as PostWithAuthor[]) ?? []);
+        if (cancelled) return;
+        const list = (data as PostWithAuthor[]) ?? [];
+        setPosts(list);
+        setHasMore(list.length === PAGE_SIZE);
         setLoading(false);
       });
+    return () => {
+      cancelled = true;
+    };
   }, [roomId]);
+
+  // 스크롤 끝에 닿으면 이전 페이지(더 오래된 글) 로드
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore || loading) return;
+    const lastPost = posts[posts.length - 1];
+    if (!lastPost) return;
+    setLoadingMore(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from('posts')
+      .select(POST_SELECT)
+      .eq('room_id', roomId)
+      .lt('created_at', lastPost.created_at)
+      .order('created_at', { ascending: false })
+      .limit(PAGE_SIZE);
+    const list = (data as PostWithAuthor[]) ?? [];
+    setPosts((prev) => {
+      const seen = new Set(prev.map((p) => p.id));
+      const next = list.filter((p) => !seen.has(p.id));
+      return [...prev, ...next];
+    });
+    setHasMore(list.length === PAGE_SIZE);
+    setLoadingMore(false);
+  }, [loadingMore, hasMore, loading, posts, roomId]);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadMore();
+      },
+      { rootMargin: '200px' },
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [loadMore]);
 
   // 현재 유저의 좋아요 / 싫어요 목록
   useEffect(() => {
@@ -101,7 +153,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
         async (payload) => {
           const { data } = await supabase
             .from('posts')
-            .select('id, content, created_at, like_count, dislike_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)')
+            .select(POST_SELECT)
             .eq('id', payload.new.id)
             .single();
           if (data) setPosts((prev) => [data as PostWithAuthor, ...prev]);
@@ -360,6 +412,14 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
             </div>
             );
           })}
+
+          {hasMore && (
+            <div ref={sentinelRef} className="flex justify-center py-4">
+              {loadingMore && (
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
