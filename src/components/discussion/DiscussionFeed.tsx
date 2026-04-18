@@ -178,7 +178,7 @@ export default function DiscussionFeed() {
             return (
               <Link
                 key={post.id}
-                href={`/stocks/${post.stock_code}`}
+                href={`/discussions/${post.id}`}
                 className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
               >
                 <div className="mb-1.5 flex items-center justify-between gap-2">
