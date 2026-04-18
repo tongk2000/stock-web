@@ -7,7 +7,7 @@
  *
  * - 검색어(`query` prop)는 URL 쿼리에서 전달됩니다. prop이 바뀌면 커서를 리셋하고 다시 로드합니다.
  * - 최신순으로 PAGE_SIZE씩 불러오고, 스크롤이 끝에 닿으면 다음 페이지를 이어 붙입니다.
- * - 카드 클릭 시 해당 종목 상세 페이지(/stocks/[code])로 이동합니다.
+ * - 카드 클릭 시 토론글 상세 페이지(/discussions/[id])로 이동합니다.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -162,7 +162,7 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
         return (
           <Link
             key={post.id}
-            href={`/stocks/${post.stock_code}`}
+            href={`/discussions/${post.id}`}
             className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
           >
             <div className="mb-1.5 flex items-center justify-between gap-2">
