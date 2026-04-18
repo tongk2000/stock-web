@@ -1,11 +1,16 @@
-/** 홈페이지 — 상단 검색창으로 유도하는 랜딩 화면 */
+/**
+ * 홈페이지 — 전체 종목의 최근 토론 피드와 검색을 제공합니다.
+ */
+
+import DiscussionFeed from '@/components/discussion/DiscussionFeed';
+
 export default function Home() {
   return (
-    <main className="flex flex-1 flex-col items-center justify-center bg-background px-4">
-      <h1 className="mb-2 text-center text-3xl font-bold text-foreground">주식 검색</h1>
-      <p className="text-center text-sm text-muted-foreground">
-        상단 검색창에서 종목명 또는 종목코드로 검색하세요
-      </p>
+    <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
+      <div className="mx-auto max-w-2xl">
+        <h1 className="mb-6 text-2xl font-bold text-foreground">토론방</h1>
+        <DiscussionFeed />
+      </div>
     </main>
   );
 }

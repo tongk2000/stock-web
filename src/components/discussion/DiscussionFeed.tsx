@@ -1,0 +1,165 @@
+'use client';
+
+/**
+ * DiscussionFeed
+ *
+ * 모든 종목의 최근 토론 게시글 피드 + 검색 컴포넌트.
+ *
+ * - 검색어가 비어 있으면 최신순 50개를 보여줍니다.
+ * - 검색어 입력 시 300ms 디바운스 후 content ILIKE 매칭으로 재조회합니다.
+ * - 카드 클릭 시 해당 종목 상세 페이지(/stocks/[code])로 이동합니다.
+ */
+
+import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Search, ThumbsUp } from 'lucide-react';
+import { createClient } from '@/lib/supabase/client';
+import { formatRelativeTime } from '@/lib/format';
+
+type Post = {
+  id: string;
+  content: string;
+  created_at: string;
+  like_count: number;
+  stock_code: string;
+  user_id: string;
+};
+
+type ProfileInfo = { nickname: string; is_premium: boolean };
+
+const PAGE_SIZE = 50;
+
+export default function DiscussionFeed() {
+  const [query, setQuery] = useState('');
+  const [debounced, setDebounced] = useState('');
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [stockMap, setStockMap] = useState<Map<string, string>>(new Map());
+  const [profileMap, setProfileMap] = useState<Map<string, ProfileInfo>>(new Map());
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query.trim()), 300);
+    return () => clearTimeout(t);
+  }, [query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const supabase = createClient();
+
+    (async () => {
+      let q = supabase
+        .from('posts')
+        .select('id, content, created_at, like_count, stock_code, user_id')
+        .order('created_at', { ascending: false })
+        .limit(PAGE_SIZE);
+      if (debounced) {
+        // content LIKE 매칭 — 특수문자 이스케이프 (%, _, \)
+        const escaped = debounced.replace(/([\\%_])/g, '\\$1');
+        q = q.ilike('content', `%${escaped}%`);
+      }
+
+      const { data: postsData } = await q;
+      if (cancelled) return;
+
+      const list = postsData ?? [];
+      const stockCodes = [...new Set(list.map((p) => p.stock_code))];
+      const userIds = [...new Set(list.map((p) => p.user_id))];
+
+      const [stocksRes, profilesRes] = await Promise.all([
+        stockCodes.length
+          ? supabase.from('stocks').select('code, name').in('code', stockCodes)
+          : Promise.resolve({ data: [] as { code: string; name: string }[] }),
+        userIds.length
+          ? supabase.from('profiles').select('id, nickname, is_premium').in('id', userIds)
+          : Promise.resolve({ data: [] as { id: string; nickname: string; is_premium: boolean }[] }),
+      ]);
+
+      if (cancelled) return;
+      setPosts(list);
+      setStockMap(new Map((stocksRes.data ?? []).map((s) => [s.code, s.name])));
+      setProfileMap(
+        new Map((profilesRes.data ?? []).map((p) => [p.id, { nickname: p.nickname, is_premium: p.is_premium }])),
+      );
+      setLoading(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [debounced]);
+
+  return (
+    <div>
+      {/* 검색창 */}
+      <div className="relative mb-5">
+        <Search
+          size={16}
+          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
+        />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="토론글 내용 검색..."
+          className="w-full rounded-xl border border-border bg-card/50 py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+        />
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[0, 1, 2, 3].map((i) => (
+            <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+          ))}
+        </div>
+      ) : posts.length === 0 ? (
+        <p className="py-16 text-center text-sm text-muted-foreground">
+          {debounced ? `"${debounced}"에 해당하는 게시글이 없습니다.` : '아직 게시글이 없습니다.'}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {posts.map((post) => {
+            const profile = profileMap.get(post.user_id);
+            return (
+              <Link
+                key={post.id}
+                href={`/stocks/${post.stock_code}`}
+                className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
+              >
+                <div className="mb-1.5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
+                      {stockMap.get(post.stock_code) ?? post.stock_code}
+                    </span>
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {profile?.nickname ?? '알 수 없음'}
+                    </span>
+                    {profile?.is_premium && (
+                      <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
+                        PRO
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatRelativeTime(post.created_at)}
+                  </span>
+                </div>
+
+                <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-foreground">
+                  {post.content}
+                </p>
+
+                {post.like_count > 0 && (
+                  <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                    <ThumbsUp size={11} />
+                    <span>{post.like_count}</span>
+                  </div>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
