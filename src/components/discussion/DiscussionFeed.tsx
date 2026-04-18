@@ -3,16 +3,16 @@
 /**
  * DiscussionFeed
  *
- * 모든 종목의 최근 토론 게시글 피드 + 검색 컴포넌트.
+ * 모든 종목의 최근 토론 게시글 피드 (무한 스크롤).
  *
- * - 최신순으로 한 페이지(PAGE_SIZE)씩 불러오고, 스크롤이 끝에 닿으면 다음 페이지를 이어 붙입니다.
- * - 검색어 입력 시 300ms 디바운스 후 content ILIKE 매칭으로 재조회(커서 초기화)합니다.
+ * - 검색어(`query` prop)는 URL 쿼리에서 전달됩니다. prop이 바뀌면 커서를 리셋하고 다시 로드합니다.
+ * - 최신순으로 PAGE_SIZE씩 불러오고, 스크롤이 끝에 닿으면 다음 페이지를 이어 붙입니다.
  * - 카드 클릭 시 해당 종목 상세 페이지(/stocks/[code])로 이동합니다.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Search, ThumbsUp } from 'lucide-react';
+import { ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatRelativeTime } from '@/lib/format';
 
@@ -29,9 +29,7 @@ type ProfileInfo = { nickname: string; is_premium: boolean };
 
 const PAGE_SIZE = 20;
 
-export default function DiscussionFeed() {
-  const [query, setQuery] = useState('');
-  const [debounced, setDebounced] = useState('');
+export default function DiscussionFeed({ query = '' }: { query?: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [stockMap, setStockMap] = useState<Map<string, string>>(new Map());
   const [profileMap, setProfileMap] = useState<Map<string, ProfileInfo>>(new Map());
@@ -39,11 +37,6 @@ export default function DiscussionFeed() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const sentinelRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const t = setTimeout(() => setDebounced(query.trim()), 300);
-    return () => clearTimeout(t);
-  }, [query]);
 
   // 한 페이지 조회 (cursor = 마지막으로 본 게시글의 created_at, 없으면 첫 페이지)
   const fetchPage = useCallback(
@@ -55,8 +48,8 @@ export default function DiscussionFeed() {
         .order('created_at', { ascending: false })
         .limit(PAGE_SIZE);
       if (cursor) q = q.lt('created_at', cursor);
-      if (debounced) {
-        const escaped = debounced.replace(/([\\%_])/g, '\\$1');
+      if (query) {
+        const escaped = query.replace(/([\\%_])/g, '\\$1');
         q = q.ilike('content', `%${escaped}%`);
       }
 
@@ -80,7 +73,7 @@ export default function DiscussionFeed() {
         profiles: profilesRes.data ?? [],
       };
     },
-    [debounced],
+    [query],
   );
 
   // 검색어 변경 시 처음부터 다시 로드
@@ -144,83 +137,71 @@ export default function DiscussionFeed() {
     return () => observer.disconnect();
   }, [loadMore]);
 
-  return (
-    <div>
-      {/* 검색창 */}
-      <div className="relative mb-5">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground"
-        />
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="토론글 내용 검색..."
-          className="w-full rounded-xl border border-border bg-card/50 py-2.5 pl-9 pr-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-        />
+  if (loading) {
+    return (
+      <div className="space-y-2">
+        {[0, 1, 2, 3].map((i) => (
+          <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
+        ))}
       </div>
+    );
+  }
 
-      {loading ? (
-        <div className="space-y-2">
-          {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-24 animate-pulse rounded-xl bg-muted" />
-          ))}
-        </div>
-      ) : posts.length === 0 ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">
-          {debounced ? `"${debounced}"에 해당하는 게시글이 없습니다.` : '아직 게시글이 없습니다.'}
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {posts.map((post) => {
-            const profile = profileMap.get(post.user_id);
-            return (
-              <Link
-                key={post.id}
-                href={`/stocks/${post.stock_code}`}
-                className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
-              >
-                <div className="mb-1.5 flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
-                      {stockMap.get(post.stock_code) ?? post.stock_code}
-                    </span>
-                    <span className="truncate text-sm font-medium text-foreground">
-                      {profile?.nickname ?? '알 수 없음'}
-                    </span>
-                    {profile?.is_premium && (
-                      <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-                        PRO
-                      </span>
-                    )}
-                  </div>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {formatRelativeTime(post.created_at)}
+  if (posts.length === 0) {
+    return (
+      <p className="py-16 text-center text-sm text-muted-foreground">
+        {query ? `"${query}"에 해당하는 게시글이 없습니다.` : '아직 게시글이 없습니다.'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {posts.map((post) => {
+        const profile = profileMap.get(post.user_id);
+        return (
+          <Link
+            key={post.id}
+            href={`/stocks/${post.stock_code}`}
+            className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
+          >
+            <div className="mb-1.5 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
+                  {stockMap.get(post.stock_code) ?? post.stock_code}
+                </span>
+                <span className="truncate text-sm font-medium text-foreground">
+                  {profile?.nickname ?? '알 수 없음'}
+                </span>
+                {profile?.is_premium && (
+                  <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
+                    PRO
                   </span>
-                </div>
-
-                <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-foreground">
-                  {post.content}
-                </p>
-
-                {post.like_count > 0 && (
-                  <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                    <ThumbsUp size={11} />
-                    <span>{post.like_count}</span>
-                  </div>
                 )}
-              </Link>
-            );
-          })}
-
-          {/* 무한 스크롤 센티넬 */}
-          {hasMore && (
-            <div ref={sentinelRef} className="flex justify-center py-4">
-              {loadingMore && (
-                <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
-              )}
+              </div>
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {formatRelativeTime(post.created_at)}
+              </span>
             </div>
+
+            <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-foreground">
+              {post.content}
+            </p>
+
+            {post.like_count > 0 && (
+              <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+                <ThumbsUp size={11} />
+                <span>{post.like_count}</span>
+              </div>
+            )}
+          </Link>
+        );
+      })}
+
+      {hasMore && (
+        <div ref={sentinelRef} className="flex justify-center py-4">
+          {loadingMore && (
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-muted-foreground" />
           )}
         </div>
       )}
