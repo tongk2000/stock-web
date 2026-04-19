@@ -26,6 +26,7 @@ import dynamic from 'next/dynamic';
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
 import { aggregateCandles } from '@/lib/indicators';
@@ -137,6 +138,7 @@ function ToggleBtn({
 }
 
 export default function StockChartSection({ code }: Props) {
+  const { signInWithGoogle } = useAuth();
   const isDark = useIsDark();
   const [exchange, setExchange] = useState<ExchangeType>('통합');
   const [candleType, setCandleType] = useState<CandleType>('daily');
@@ -242,11 +244,14 @@ export default function StockChartSection({ code }: Props) {
 
   // ── 메모 핸들러 ───────────────────────────────────────────────────────────────
   const handleDateClick = useCallback((date: string) => {
-    if (!userId) return; // 비로그인 시 무시
+    if (!userId) {
+      signInWithGoogle();
+      return;
+    }
     setMemoInput(memoRecord[date] ?? '');
     setSelectedDate(date);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [memoRecord, userId]);
+  }, [memoRecord, userId, signInWithGoogle]);
 
   const saveMemo = useCallback(() => {
     if (!selectedDate || !userId) return;
