@@ -8,7 +8,8 @@
  *   - 비로그인     : localStorage (`stock-favorites` 키)
  *
  * 로그인 상태가 바뀌면 자동으로 저장소를 전환합니다.
- * LeftNav의 즐겨찾기 섹션과 FavoriteButton에서 사용합니다.
+ * 로그인 시점에 localStorage에 쌓인 즐겨찾기를 서버로 병합(upsert)하고
+ * localStorage는 비웁니다. LeftNav의 즐겨찾기 섹션과 FavoriteButton에서 사용합니다.
  */
 
 'use client';
@@ -48,29 +49,58 @@ function saveLocal(list: FavoriteStock[]) {
   } catch {}
 }
 
+function clearLocal() {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {}
+}
+
 export function FavoritesProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
   const [favorites, setFavorites] = useState<FavoriteStock[]>([]);
 
   // 로그인 상태 변화에 따라 즐겨찾기 로드
+  // 로그인 시점에는 비로그인 중 쌓인 localStorage 즐겨찾기를 서버로 병합한다
   useEffect(() => {
-    if (user) {
-      // 로그인: Supabase에서 불러오기
-      const supabase = createClient();
-      supabase
+    if (!user) {
+      setFavorites(loadLocal());
+      return;
+    }
+
+    let cancelled = false;
+    const supabase = createClient();
+
+    (async () => {
+      // 1. 비로그인 중 저장된 로컬 즐겨찾기를 upsert로 서버와 병합
+      const local = loadLocal();
+      if (local.length > 0) {
+        const { error } = await supabase.from('favorites').upsert(
+          local.map((f) => ({
+            user_id: user.id,
+            stock_code: f.code,
+            stock_name: f.name,
+          })),
+          { onConflict: 'user_id,stock_code', ignoreDuplicates: true },
+        );
+        // 병합 성공 시에만 로컬 비움 (실패 시 다음 로그인 때 재시도)
+        if (!error) clearLocal();
+      }
+
+      // 2. 병합된 서버 목록 로드
+      const { data } = await supabase
         .from('favorites')
         .select('stock_code, stock_name')
         .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-        .then(({ data }) => {
-          if (data) {
-            setFavorites(data.map((r) => ({ code: r.stock_code, name: r.stock_name })));
-          }
-        });
-    } else {
-      // 비로그인: localStorage
-      setFavorites(loadLocal());
-    }
+        .order('created_at', { ascending: true });
+      if (cancelled) return;
+      if (data) {
+        setFavorites(data.map((r) => ({ code: r.stock_code, name: r.stock_name })));
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const addFavorite = useCallback((stock: FavoriteStock) => {
