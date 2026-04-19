@@ -21,6 +21,8 @@ import {
   Sun,
   Moon,
   Star,
+  ChevronDown,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme-provider';
@@ -28,9 +30,28 @@ import { useFavorites } from '@/contexts/FavoritesContext';
 import { useSidebar } from '@/contexts/SidebarContext';
 import { useScrollAtTop } from '@/hooks/useScrollAtTop';
 
-const navItems = [
+type NavItem =
+  | { href: string; label: string; icon: LucideIcon; children?: never }
+  | {
+      href: string;            // 부모 자체도 클릭 시 이동할 대표 경로
+      label: string;
+      icon: LucideIcon;
+      children: { href: string; label: string }[];
+    };
+
+const navItems: NavItem[] = [
   { href: '/', label: '홈', icon: Home },
-  { href: '/stocks', label: '주식', icon: TrendingUp },
+  {
+    href: '/rankings',
+    label: '랭킹',
+    icon: TrendingUp,
+    children: [
+      { href: '/rankings/volume', label: '거래량' },
+      { href: '/rankings/movers', label: '등락률' },
+      { href: '/rankings/trending', label: '토론 핫' },
+      { href: '/rankings/valuation', label: '가치·시총' },
+    ],
+  },
   { href: '/discussions', label: '토론방', icon: MessageSquare },
 ];
 
@@ -92,24 +113,70 @@ export function LeftNav() {
         <div className="flex-1 overflow-y-auto flex flex-col">
           {/* 네비게이션 메뉴 */}
           <nav className="p-2 pt-4">
-            {navItems.map(({ href, label, icon: Icon }) => {
+            {navItems.map((item) => {
+              const Icon = item.icon;
               const isActive =
-                href === '/' ? pathname === '/' : pathname.startsWith(href);
+                item.href === '/'
+                  ? pathname === '/'
+                  : pathname.startsWith(item.href);
+
+              if (!item.children) {
+                return (
+                  <Link
+                    key={item.href}
+                    href={item.href}
+                    onClick={close}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    {item.label}
+                  </Link>
+                );
+              }
+
+              // children 있음: 항상 펼쳐서 보여줌 (active 경로면 부모도 강조)
               return (
-                <Link
-                  key={href}
-                  href={href}
-                  onClick={close}
-                  className={cn(
-                    'flex items-center gap-3 px-3 py-2.5 rounded-lg mb-1 text-sm font-medium transition-colors',
-                    isActive
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
-                  )}
-                >
-                  <Icon className="size-4 shrink-0" />
-                  {label}
-                </Link>
+                <div key={item.href} className="mb-1">
+                  <Link
+                    href={item.href}
+                    onClick={close}
+                    className={cn(
+                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors',
+                      isActive
+                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                    )}
+                  >
+                    <Icon className="size-4 shrink-0" />
+                    <span className="flex-1">{item.label}</span>
+                    <ChevronDown className="size-3.5 opacity-60" />
+                  </Link>
+                  <div className="mt-0.5 ml-3 border-l border-sidebar-border pl-2">
+                    {item.children.map((child) => {
+                      const childActive = pathname === child.href;
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          onClick={close}
+                          className={cn(
+                            'flex items-center px-3 py-1.5 rounded-md text-xs font-medium transition-colors',
+                            childActive
+                              ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                              : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
+                          )}
+                        >
+                          {child.label}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                </div>
               );
             })}
           </nav>

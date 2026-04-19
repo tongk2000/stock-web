@@ -19,3 +19,39 @@ export function formatRelativeTime(dateStr: string): string {
   if (day < 7) return `${day}일 전`;
   return new Date(dateStr).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' });
 }
+
+/**
+ * 큰 금액(원)을 한국식 단위로 축약합니다.
+ *   1,234       → "1,234"
+ *   1,234,000   → "123만"
+ *   123_456_789 → "1.23억"
+ *   1_234_000_000_000 → "1.23조"
+ */
+export function formatKRWCompact(value: number | null | undefined): string {
+  if (value == null || !Number.isFinite(value)) return '-';
+  const abs = Math.abs(value);
+  const sign = value < 0 ? '-' : '';
+  if (abs >= 1_0000_0000_0000) return `${sign}${(abs / 1_0000_0000_0000).toFixed(2)}조`;
+  if (abs >= 1_0000_0000) return `${sign}${(abs / 1_0000_0000).toFixed(2)}억`;
+  if (abs >= 1_0000) return `${sign}${Math.round(abs / 1_0000).toLocaleString()}만`;
+  return `${sign}${Math.round(abs).toLocaleString()}`;
+}
+
+/**
+ * 백분율 표기. 부호 포함, 소수점 자릿수 지정 가능.
+ */
+export function formatPercent(value: number | null | undefined, digits = 2): string {
+  if (value == null || !Number.isFinite(value)) return '-';
+  const sign = value > 0 ? '+' : '';
+  return `${sign}${value.toFixed(digits)}%`;
+}
+
+/**
+ * 숫자에 천단위 콤마.
+ */
+export function formatNumber(value: number | null | undefined, digits = 0): string {
+  if (value == null || !Number.isFinite(value)) return '-';
+  return digits === 0
+    ? Math.round(value).toLocaleString()
+    : value.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: digits });
+}

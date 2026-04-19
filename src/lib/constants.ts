@@ -53,3 +53,18 @@ export const STORAGE_KEYS = {
  * StockChartSection과 CandleChart 양쪽에서 동일하게 사용됩니다.
  */
 export const MA_PERIODS = [5, 20, 60, 120] as const;
+
+/**
+ * 랭킹 페이지(/rankings/*) 공용 상수.
+ *
+ * - PAGE_SIZE                  : 한 랭킹에 노출할 종목 수
+ * - HUB_PREVIEW_SIZE           : 허브 페이지 카드에 미리보기로 보여줄 행 수
+ * - VOLUME_SURGE_LOOKBACK_DAYS : 거래량 급증 계산 시 평균에 사용하는 직전 영업일 수
+ * - TRENDING_WINDOW_HOURS      : 토론 핫 종목 집계 윈도우(시간)
+ */
+export const RANKING = {
+  PAGE_SIZE: 50,
+  HUB_PREVIEW_SIZE: 5,
+  VOLUME_SURGE_LOOKBACK_DAYS: 20,
+  TRENDING_WINDOW_HOURS: 24,
+} as const;
