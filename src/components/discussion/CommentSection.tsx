@@ -64,7 +64,7 @@ function normalize(row: CommentRow): Comment {
 }
 
 export default function CommentSection({ postId }: Props) {
-  const { user } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
   const [comments, setComments] = useState<Comment[]>([]);
   const [loading, setLoading] = useState(true);
   const [content, setContent] = useState('');
@@ -116,7 +116,11 @@ export default function CommentSection({ postId }: Props) {
   }, [postId]);
 
   const handleSubmit = useCallback(async () => {
-    if (!user || !content.trim() || submitting) return;
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
+    if (!content.trim() || submitting) return;
     setSubmitting(true);
 
     // 대댓글은 모두 최상위 댓글의 자식으로 평탄화
@@ -149,7 +153,7 @@ export default function CommentSection({ postId }: Props) {
     setContent('');
     setReplyTarget(null);
     setSubmitting(false);
-  }, [user, content, submitting, postId, replyTarget]);
+  }, [user, content, submitting, postId, replyTarget, signInWithGoogle]);
 
   const handleDelete = useCallback(async (commentId: string) => {
     if (!user) return;
@@ -159,9 +163,13 @@ export default function CommentSection({ postId }: Props) {
   }, [user]);
 
   const startReply = useCallback((target: Comment) => {
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
     setReplyTarget(target);
     setTimeout(() => textareaRef.current?.focus(), 0);
-  }, []);
+  }, [user, signInWithGoogle]);
 
   const topLevel = comments.filter((c) => c.parent_id === null);
   const repliesByParent = new Map<string, Comment[]>();
@@ -194,7 +202,7 @@ export default function CommentSection({ postId }: Props) {
                 <CommentItem
                   comment={c}
                   canDelete={user?.id === c.user_id}
-                  canReply={!!user}
+                  canReply={true}
                   onReply={() => startReply(c)}
                   onDelete={() => handleDelete(c.id)}
                 />
@@ -205,7 +213,7 @@ export default function CommentSection({ postId }: Props) {
                         <CommentItem
                           comment={r}
                           canDelete={user?.id === r.user_id}
-                          canReply={!!user}
+                          canReply={true}
                           onReply={() => startReply(r)}
                           onDelete={() => handleDelete(r.id)}
                         />
@@ -220,49 +228,49 @@ export default function CommentSection({ postId }: Props) {
       )}
 
       {/* 입력 */}
-      {user ? (
-        <div className="mt-3">
-          {replyTarget && (
-            <div className="mb-1.5 flex items-center justify-between rounded-md bg-accent/50 px-2.5 py-1.5 text-xs text-muted-foreground">
-              <span>
-                <span className="font-medium text-foreground">@{replyTarget.nickname}</span>
-                님에게 답글
-              </span>
-              <button
-                onClick={() => setReplyTarget(null)}
-                className="text-muted-foreground hover:text-foreground"
-              >
-                취소
-              </button>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <textarea
-              ref={textareaRef}
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
-              }}
-              placeholder={replyTarget ? '답글을 입력하세요' : '댓글을 입력하세요'}
-              className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-              rows={2}
-              maxLength={500}
-            />
+      <div className="mt-3">
+        {user && replyTarget && (
+          <div className="mb-1.5 flex items-center justify-between rounded-md bg-accent/50 px-2.5 py-1.5 text-xs text-muted-foreground">
+            <span>
+              <span className="font-medium text-foreground">@{replyTarget.nickname}</span>
+              님에게 답글
+            </span>
             <button
-              onClick={handleSubmit}
-              disabled={!content.trim() || submitting}
-              className="self-end rounded-lg bg-violet-500/20 px-3 py-1.5 text-xs font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => setReplyTarget(null)}
+              className="text-muted-foreground hover:text-foreground"
             >
-              {submitting ? '등록 중' : '등록'}
+              취소
             </button>
           </div>
+        )}
+        <div className="flex gap-2">
+          <textarea
+            ref={textareaRef}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            onFocus={() => { if (!user) signInWithGoogle(); }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
+            }}
+            placeholder={
+              !user
+                ? '로그인 후 댓글을 작성할 수 있습니다. 클릭하여 로그인'
+                : replyTarget ? '답글을 입력하세요' : '댓글을 입력하세요'
+            }
+            className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+            rows={2}
+            maxLength={500}
+            readOnly={!user}
+          />
+          <button
+            onClick={handleSubmit}
+            disabled={user ? (!content.trim() || submitting) : false}
+            className="self-end rounded-lg bg-violet-500/20 px-3 py-1.5 text-xs font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {user ? (submitting ? '등록 중' : '등록') : '로그인'}
+          </button>
         </div>
-      ) : (
-        <p className="mt-3 text-xs text-muted-foreground">
-          로그인 후 댓글을 작성할 수 있습니다.
-        </p>
-      )}
+      </div>
     </div>
   );
 }

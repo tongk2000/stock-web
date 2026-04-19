@@ -34,7 +34,7 @@ const POST_SELECT =
   'id, content, created_at, like_count, dislike_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)';
 
 export default function DiscussionSection({ roomId, stockCode }: Props) {
-  const { user } = useAuth();
+  const { user, signInWithGoogle } = useAuth();
   const [posts, setPosts] = useState<PostWithAuthor[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -189,7 +189,11 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
   }, [roomId]);
 
   const handleSubmit = useCallback(async () => {
-    if (!user || !content.trim() || submitting) return;
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
+    if (!content.trim() || submitting) return;
     setSubmitting(true);
     const supabase = createClient();
     await supabase.from('posts').insert({
@@ -201,10 +205,13 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
     setContent('');
     setSubmitting(false);
     textareaRef.current?.focus();
-  }, [user, content, submitting, roomId, stockCode]);
+  }, [user, content, submitting, roomId, stockCode, signInWithGoogle]);
 
   const handleLike = useCallback(async (postId: string) => {
-    if (!user) return;
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
     const isLiked = likedSet.has(postId);
     const isDisliked = dislikedSet.has(postId);
     const supabase = createClient();
@@ -231,10 +238,13 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       }
       await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
     }
-  }, [user, likedSet, dislikedSet]);
+  }, [user, likedSet, dislikedSet, signInWithGoogle]);
 
   const handleDislike = useCallback(async (postId: string) => {
-    if (!user) return;
+    if (!user) {
+      signInWithGoogle();
+      return;
+    }
     const isDisliked = dislikedSet.has(postId);
     const isLiked = likedSet.has(postId);
     const supabase = createClient();
@@ -261,7 +271,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       }
       await supabase.from('post_dislikes').insert({ post_id: postId, user_id: user.id });
     }
-  }, [user, likedSet, dislikedSet]);
+  }, [user, likedSet, dislikedSet, signInWithGoogle]);
 
   const handleDelete = useCallback(async (postId: string) => {
     if (!user) return;
@@ -275,36 +285,32 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       <h2 className="mb-4 text-lg font-semibold text-foreground">토론방</h2>
 
       {/* 글 작성 폼 */}
-      {user ? (
-        <div className="mb-5 rounded-xl border border-border bg-card/50 p-4">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
-            }}
-            placeholder="의견을 남겨보세요... (Ctrl+Enter로 등록)"
-            className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-            rows={3}
-            maxLength={1000}
-          />
-          <div className="mt-2 flex items-center justify-between">
-            <span className="text-xs text-muted-foreground">{content.length} / 1000</span>
-            <button
-              onClick={handleSubmit}
-              disabled={!content.trim() || submitting}
-              className="rounded-lg bg-violet-500/20 px-4 py-1.5 text-sm font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {submitting ? '등록 중...' : '등록'}
-            </button>
-          </div>
+      <div className="mb-5 rounded-xl border border-border bg-card/50 p-4">
+        <textarea
+          ref={textareaRef}
+          value={content}
+          onChange={(e) => setContent(e.target.value)}
+          onFocus={() => { if (!user) signInWithGoogle(); }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) handleSubmit();
+          }}
+          placeholder={user ? '의견을 남겨보세요... (Ctrl+Enter로 등록)' : '로그인 후 의견을 남길 수 있습니다. 클릭하여 로그인'}
+          className="w-full resize-none rounded-lg border border-border bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+          rows={3}
+          maxLength={1000}
+          readOnly={!user}
+        />
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-xs text-muted-foreground">{content.length} / 1000</span>
+          <button
+            onClick={handleSubmit}
+            disabled={user ? (!content.trim() || submitting) : false}
+            className="rounded-lg bg-violet-500/20 px-4 py-1.5 text-sm font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {user ? (submitting ? '등록 중...' : '등록') : '로그인'}
+          </button>
         </div>
-      ) : (
-        <div className="mb-5 rounded-xl border border-border bg-card/50 px-4 py-3 text-sm text-muted-foreground">
-          로그인 후 의견을 남길 수 있습니다.
-        </div>
-      )}
+      </div>
 
       {/* 게시글 목록 */}
       {loading ? (
@@ -348,7 +354,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                 {/* 좋아요 - 본인 글은 비활성화 */}
                 <button
                   onClick={() => handleLike(post.id)}
-                  disabled={!user || isMyPost}
+                  disabled={isMyPost}
                   title={isMyPost ? '본인 글에는 좋아요를 누를 수 없습니다' : undefined}
                   className={cn(
                     'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
@@ -366,7 +372,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                 {/* 싫어요 - 본인 글은 비활성화 */}
                 <button
                   onClick={() => handleDislike(post.id)}
-                  disabled={!user || isMyPost}
+                  disabled={isMyPost}
                   title={isMyPost ? '본인 글에는 싫어요를 누를 수 없습니다' : undefined}
                   className={cn(
                     'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
