@@ -24,7 +24,7 @@ type AuthContextType = {
   user: User | null
   nickname: string | null
   loading: boolean
-  signInWithGoogle: () => Promise<void>
+  signInWithGoogle: (next?: string) => Promise<void>
   signOut: () => Promise<void>
 }
 
@@ -66,12 +66,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
-  const signInWithGoogle = async () => {
+  const signInWithGoogle = async (next?: string) => {
     const supabase = createClient()
+    // 로그인 후 돌아갈 경로 — 인자로 받거나 현재 페이지를 기본값으로 사용
+    const current = `${location.pathname}${location.search}${location.hash}`
+    // /auth/* 경로에서 로그인 시에는 복귀 경로로 삼지 않음 (콜백/셋업 재진입 방지)
+    const target = next ?? (location.pathname.startsWith('/auth/') ? '/' : current)
+    const safeNext = target.startsWith('/') && !target.startsWith('//') ? target : '/'
+    const callbackUrl = new URL('/auth/callback', location.origin)
+    callbackUrl.searchParams.set('next', safeNext)
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${location.origin}/auth/callback`,
+        redirectTo: callbackUrl.toString(),
       },
     })
   }

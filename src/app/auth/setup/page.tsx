@@ -3,7 +3,7 @@
  *
  * 신규 가입 시 /auth/callback에서 리다이렉트됩니다.
  * 닉네임(2~20자)을 입력받아 profiles 테이블에 저장하고
- * onboarded=true로 업데이트한 뒤 홈으로 이동합니다.
+ * onboarded=true로 업데이트한 뒤 ?next= 경로(없으면 홈)로 이동합니다.
  *
  * 에러 처리:
  *   - 닉네임 길이 검증 (2~20자)
@@ -15,6 +15,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+
+function getNextPath(): string {
+  if (typeof window === 'undefined') return '/'
+  const raw = new URLSearchParams(window.location.search).get('next') ?? '/'
+  // open redirect 방지 — 내부 경로만 허용
+  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+}
 
 export default function SetupPage() {
   const router = useRouter()
@@ -41,7 +48,7 @@ export default function SetupPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      router.replace('/')
+      router.replace(getNextPath())
       return
     }
 
@@ -60,7 +67,7 @@ export default function SetupPage() {
       return
     }
 
-    router.replace('/')
+    router.replace(getNextPath())
   }
 
   return (
