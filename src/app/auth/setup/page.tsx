@@ -16,11 +16,16 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-function getNextPath(): string {
+function consumeNextPath(): string {
   if (typeof window === 'undefined') return '/'
-  const raw = new URLSearchParams(window.location.search).get('next') ?? '/'
+  let raw: string | null = null
+  try {
+    raw = sessionStorage.getItem('post-auth-next')
+    sessionStorage.removeItem('post-auth-next')
+  } catch {}
+  const target = raw ?? '/'
   // open redirect 방지 — 내부 경로만 허용
-  return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/'
+  return target.startsWith('/') && !target.startsWith('//') ? target : '/'
 }
 
 export default function SetupPage() {
@@ -48,7 +53,7 @@ export default function SetupPage() {
     const { data: { user } } = await supabase.auth.getUser()
 
     if (!user) {
-      router.replace(getNextPath())
+      router.replace(consumeNextPath())
       return
     }
 
@@ -67,7 +72,7 @@ export default function SetupPage() {
       return
     }
 
-    router.replace(getNextPath())
+    router.replace(consumeNextPath())
   }
 
   return (
