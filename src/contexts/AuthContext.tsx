@@ -73,12 +73,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // /auth/* 경로에서 로그인 시에는 복귀 경로로 삼지 않음 (콜백/셋업 재진입 방지)
     const target = next ?? (location.pathname.startsWith('/auth/') ? '/' : current)
     const safeNext = target.startsWith('/') && !target.startsWith('//') ? target : '/'
-    const callbackUrl = new URL('/auth/callback', location.origin)
-    callbackUrl.searchParams.set('next', safeNext)
+    // redirectTo에 쿼리를 붙이면 Supabase 허용 redirect URL 매칭에서 제외돼
+    // Site URL(로컬호스트 등)로 폴백될 수 있으므로, 복귀 경로는 sessionStorage에 저장
+    try {
+      sessionStorage.setItem('post-auth-next', safeNext)
+    } catch {}
     await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: callbackUrl.toString(),
+        redirectTo: `${location.origin}/auth/callback`,
       },
     })
   }
