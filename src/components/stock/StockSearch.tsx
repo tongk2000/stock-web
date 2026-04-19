@@ -1,171 +1,70 @@
 /**
- * StockSearch
+ * StockSearch (헤더 검색창)
  *
- * 종목 검색 자동완성 컴포넌트입니다. AppHeader에서 사용합니다.
+ * AppHeader 에 고정되는 통합 검색 폼입니다.
  *
  * 동작:
- *   - 입력 500ms 디바운스 후 Supabase stocks 테이블에서 이름/코드 ILIKE 검색
- *   - 키보드 네비게이션 (ArrowUp/Down, Enter, Escape) 지원
- *   - 종목 선택 시 /stocks/[code]로 라우팅 + 스피너 표시
- *   - 외부 클릭 시 드롭다운 닫힘
+ *   - Enter(또는 폼 submit) 시 `/search?q=...` 로 이동
+ *   - 통합 검색 페이지에서 종목과 토론글을 함께 보여줌
+ *   - `/search` 방문 시 현재 쿼리를 입력창에 반영
  */
 
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
+import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { Stock } from '@/types/stock';
-
-type SearchResult = Pick<Stock, 'code' | 'name' | 'market'>;
 
 export default function StockSearch() {
   const router = useRouter();
   const pathname = usePathname();
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<SearchResult[]>([]);
-  const [isOpen, setIsOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
-  const [activeIndex, setActiveIndex] = useState(-1);
-  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setIsNavigating(false);
+    if (pathname === '/search' && typeof window !== 'undefined') {
+      setQuery(new URLSearchParams(window.location.search).get('q') ?? '');
+    }
   }, [pathname]);
 
-  useEffect(() => {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     const q = query.trim();
-    if (q.length < 1) {
-      setResults([]);
-      setIsOpen(false);
-      return;
-    }
-
-    setLoading(true);
-    const timer = setTimeout(() => {
-      const supabase = createClient();
-      supabase
-        .from('stocks')
-        .select('code, name, market')
-        .or(`name.ilike.%${q}%,code.ilike.%${q}%`)
-        .limit(10)
-        .then(({ data }) => {
-          setResults(data ?? []);
-          setIsOpen(true);
-          setActiveIndex(-1);
-          setLoading(false);
-        });
-    }, 500);
-
-    return () => clearTimeout(timer);
-  }, [query]);
-
-  useEffect(() => {
-    function handleMouseDown(e: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleMouseDown);
-    return () => document.removeEventListener('mousedown', handleMouseDown);
-  }, []);
-
-  const selectStock = useCallback(
-    (code: string) => {
-      setIsOpen(false);
-      setQuery('');
-      setIsNavigating(true);
-      router.push(`/stocks/${code}`);
-    },
-    [router],
-  );
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (!isOpen || results.length === 0) return;
-
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setActiveIndex((i) => (i + 1) % results.length);
-    } else if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setActiveIndex((i) => (i <= 0 ? results.length - 1 : i - 1));
-    } else if (e.key === 'Enter') {
-      e.preventDefault();
-      const target = activeIndex >= 0 ? results[activeIndex] : results[0];
-      if (target) selectStock(target.code);
-    } else if (e.key === 'Escape') {
-      setIsOpen(false);
-    }
+    if (!q) return;
+    setIsNavigating(true);
+    router.push(`/search?q=${encodeURIComponent(q)}`);
   }
 
   return (
-    <div ref={containerRef} className="relative w-full max-w-xl">
-      <div className="relative flex items-center">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onFocus={() => results.length > 0 && setIsOpen(true)}
-          placeholder={isNavigating ? '종목 불러오는 중...' : '종목명 또는 종목코드 검색'}
-          disabled={isNavigating}
-          className={cn(
-            'w-full rounded-xl border border-input bg-card px-5 py-3.5',
-            'text-foreground placeholder:text-muted-foreground outline-none',
-            'focus:border-ring focus:ring-1 focus:ring-ring',
-            'text-base transition-colors',
-            isNavigating && 'cursor-wait opacity-70',
-          )}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        {(loading || isNavigating) && (
-          <div className="absolute right-4 h-4 w-4 animate-spin rounded-full border-2 border-muted border-t-foreground" />
+    <form onSubmit={handleSubmit} role="search" className="relative w-full max-w-xl">
+      <Search
+        size={18}
+        aria-hidden
+        className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
+      />
+      <input
+        type="search"
+        name="q"
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+        placeholder={isNavigating ? '검색 중...' : '종목 · 토론글 검색'}
+        disabled={isNavigating}
+        className={cn(
+          'w-full rounded-xl border border-input bg-card py-3.5 pl-11 pr-10',
+          'text-foreground placeholder:text-muted-foreground outline-none',
+          'focus:border-ring focus:ring-1 focus:ring-ring',
+          'text-base transition-colors',
+          isNavigating && 'cursor-wait opacity-70',
         )}
-      </div>
-
-      {isOpen && results.length > 0 && (
-        <ul className="absolute z-50 mt-1.5 w-full overflow-hidden rounded-xl border border-border bg-card shadow-xl">
-          {results.map((stock, i) => (
-            <li key={stock.code}>
-              <button
-                type="button"
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                  selectStock(stock.code);
-                }}
-                className={cn(
-                  'flex w-full items-center gap-3 px-4 py-3 text-left transition-colors',
-                  i === activeIndex
-                    ? 'bg-accent text-accent-foreground'
-                    : 'text-foreground hover:bg-accent/60',
-                )}
-              >
-                <span className="font-medium">{stock.name}</span>
-                <span className="text-sm text-muted-foreground">{stock.code}</span>
-                <span
-                  className={cn(
-                    'ml-auto rounded px-1.5 py-0.5 text-xs font-semibold',
-                    stock.market === 'KOSPI'
-                      ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                      : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-                  )}
-                >
-                  {stock.market}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        autoComplete="off"
+        spellCheck={false}
+        aria-label="종목 및 토론글 검색"
+      />
+      {isNavigating && (
+        <div className="absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin rounded-full border-2 border-muted border-t-foreground" />
       )}
-
-      {isOpen && !loading && results.length === 0 && query.trim().length > 0 && (
-        <div className="absolute z-50 mt-1.5 w-full rounded-xl border border-border bg-card px-4 py-3 text-sm text-muted-foreground shadow-xl">
-          검색 결과가 없습니다.
-        </div>
-      )}
-    </div>
+    </form>
   );
 }
