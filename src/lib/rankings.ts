@@ -298,8 +298,52 @@ export async function getTrendingRanking(
 }
 
 // ============================================================
-// 가치/시총
+// 유동물량 대비 거래량
+//
+// 유동주식수(float_shares)는 KRX 주요 지수 구성종목만 데이터가 존재하므로
+// 이 랭킹은 지수 구성종목에 한정됩니다 (비지수 = 제공 예외대상).
 // ============================================================
+
+type FloatVolumeRow = {
+  code: string;
+  name: string;
+  market: 'KOSPI' | 'KOSDAQ';
+  float_shares: number;
+  today_close: number;
+  today_volume: number;
+  today_value: number;
+  change_rate: number | null;
+  volume_to_float: number;
+};
+
+export async function getFloatVolumeRanking(
+  limit: number = RANKING.PAGE_SIZE,
+): Promise<RankingTableRow[]> {
+  const supabase = await createClient();
+
+  const { data } = await supabase
+    .from('v_float_volume_ranking')
+    .select(
+      'code, name, market, float_shares, today_close, today_volume, today_value, change_rate, volume_to_float',
+    )
+    .order('volume_to_float', { ascending: false })
+    .limit(limit);
+
+  const rows = (data ?? []) as FloatVolumeRow[];
+
+  return rows.map<RankingTableRow>((r) => ({
+    code: r.code,
+    name: r.name,
+    market: r.market,
+    metric: formatPercent(r.volume_to_float * 100, 2),
+    metricTone: toneFromChange(r.change_rate),
+    secondary: [
+      { label: '거래량', value: formatNumber(r.today_volume) },
+      { label: '유동주식', value: formatNumber(r.float_shares) },
+      { label: '등락', value: formatPercent(r.change_rate) },
+    ],
+  }));
+}
 
 export async function getValuationRanking(
   tab: ValuationTab,

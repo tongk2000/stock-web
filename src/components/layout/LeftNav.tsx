@@ -47,6 +47,7 @@ const navItems: NavItem[] = [
     icon: TrendingUp,
     children: [
       { href: '/rankings/volume', label: '거래량' },
+      { href: '/rankings/float-volume', label: '유동물량 대비' },
       { href: '/rankings/movers', label: '등락률' },
       { href: '/rankings/trending', label: '토론 핫' },
       { href: '/rankings/valuation', label: '가치·시총' },
