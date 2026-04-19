@@ -16,7 +16,9 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get('code')
-  const next = searchParams.get('next') ?? '/'
+  const rawNext = searchParams.get('next') ?? '/'
+  // open redirect 방지 — 내부 경로만 허용
+  const next = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '/'
 
   if (code) {
     const supabase = await createClient()
@@ -32,9 +34,11 @@ export async function GET(request: Request) {
           .eq('id', user.id)
           .single()
 
-        // 온보딩 미완료(신규 가입)면 닉네임 설정 페이지로
+        // 온보딩 미완료(신규 가입)면 닉네임 설정 페이지로 (복귀 경로 전달)
         if (!profile?.onboarded) {
-          return NextResponse.redirect(`${origin}/auth/setup`)
+          const setupUrl = new URL('/auth/setup', origin)
+          setupUrl.searchParams.set('next', next)
+          return NextResponse.redirect(setupUrl.toString())
         }
       }
 

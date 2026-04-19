@@ -74,7 +74,7 @@ export default function AppHeader() {
             </div>
           ) : (
             <button
-              onClick={signInWithGoogle}
+              onClick={() => signInWithGoogle()}
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg px-3 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
             >
               <LogIn size={16} />
