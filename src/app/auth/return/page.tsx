@@ -10,6 +10,7 @@
 
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { STORAGE_KEYS } from '@/lib/constants'
 
 export default function AuthReturnPage() {
   const router = useRouter()
@@ -17,8 +18,8 @@ export default function AuthReturnPage() {
   useEffect(() => {
     let target = '/'
     try {
-      const raw = sessionStorage.getItem('post-auth-next')
-      sessionStorage.removeItem('post-auth-next')
+      const raw = sessionStorage.getItem(STORAGE_KEYS.POST_AUTH_NEXT)
+      sessionStorage.removeItem(STORAGE_KEYS.POST_AUTH_NEXT)
       if (raw && raw.startsWith('/') && !raw.startsWith('//')) {
         target = raw
       }

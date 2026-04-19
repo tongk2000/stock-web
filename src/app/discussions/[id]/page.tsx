@@ -15,9 +15,7 @@ import { createClient } from '@/lib/supabase/server';
 import CommentSection from '@/components/discussion/CommentSection';
 import PostLikeButtons from '@/components/discussion/PostLikeButtons';
 import { formatRelativeTime } from '@/lib/format';
-
-// 좋아요 또는 댓글이 이 값 이상이어야 검색엔진 색인 허용
-const ENGAGEMENT_THRESHOLD = 3;
+import { ENGAGEMENT_THRESHOLD } from '@/lib/constants';
 
 interface Props {
   params: Promise<{ id: string }>;

@@ -19,6 +19,7 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { User } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/client'
+import { STORAGE_KEYS } from '@/lib/constants'
 
 type AuthContextType = {
   user: User | null
@@ -76,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // redirectTo에 쿼리를 붙이면 Supabase 허용 redirect URL 매칭에서 제외돼
     // Site URL(로컬호스트 등)로 폴백될 수 있으므로, 복귀 경로는 sessionStorage에 저장
     try {
-      sessionStorage.setItem('post-auth-next', safeNext)
+      sessionStorage.setItem(STORAGE_KEYS.POST_AUTH_NEXT, safeNext)
     } catch {}
     await supabase.auth.signInWithOAuth({
       provider: 'google',

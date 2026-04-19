@@ -30,6 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
 import { aggregateCandles } from '@/lib/indicators';
+import { STORAGE_KEYS, MA_PERIODS } from '@/lib/constants';
 import type { Candle, CandleType } from '@/types/stock';
 import type { IndicatorOptions } from '@/components/chart/CandleChart';
 
@@ -46,8 +47,6 @@ const CANDLE_TYPES: { value: CandleType; label: string }[] = [
   { value: 'weekly', label: '주봉' },
   { value: 'monthly', label: '월봉' },
 ];
-const MA_PERIODS = [5, 20, 60, 120] as const;
-
 // 이평선 기간별 색상 — CandleChart의 MA_SOLID와 동일한 값 (토글 버튼 accent용)
 const MA_COLORS: Record<number, string> = {
   5: '#d97706',
@@ -56,7 +55,7 @@ const MA_COLORS: Record<number, string> = {
   120: '#16a34a',
 };
 
-const STORAGE_KEY = 'stock-indicators';
+const STORAGE_KEY = STORAGE_KEYS.INDICATORS;
 
 const DEFAULT_INDICATORS: IndicatorOptions = {
   volume: true,

@@ -7,6 +7,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { STORAGE_KEYS } from "@/lib/constants";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -32,7 +33,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const scriptStr = `(function(){try{var d=document.documentElement,c=d.classList;c.remove('light','dark');var e=localStorage.getItem('vite-ui-theme');if(e==='system'||!e){var t='(prefers-color-scheme: dark)',m=window.matchMedia(t);if(m.media!==t||m.matches){d.classList.add('dark');}else{d.classList.add('light');}}else if(e){c.add(e||'')}if(e==='light'||e==='dark')d.classList.add(e);}catch(e){}})()`;
+  // 하이드레이션 전 테마 깜빡임(FOUC) 방지 — <head>에서 동기 실행되어
+  // localStorage 값을 읽고 <html>에 'light'/'dark' 클래스를 선반영합니다.
+  // THEME 키는 사용자 데이터 호환성 때문에 상수를 통해 주입합니다.
+  const scriptStr = `(function(){try{var d=document.documentElement,c=d.classList;c.remove('light','dark');var e=localStorage.getItem(${JSON.stringify(STORAGE_KEYS.THEME)});if(e==='system'||!e){var t='(prefers-color-scheme: dark)',m=window.matchMedia(t);if(m.media!==t||m.matches){d.classList.add('dark');}else{d.classList.add('light');}}else if(e){c.add(e||'')}if(e==='light'||e==='dark')d.classList.add(e);}catch(e){}})()`;
 
   return (
     <html
@@ -59,7 +63,7 @@ export default function RootLayout({
        * - 데스크탑: LeftNav 항상 노출, 햄버거 버튼 숨김
        */}
       <body className="min-h-full flex flex-col">
-        <ThemeProvider defaultTheme="system" storageKey="vite-ui-theme">
+        <ThemeProvider defaultTheme="system" storageKey={STORAGE_KEYS.THEME}>
           <AuthProvider>
           <FavoritesProvider>
             <SidebarProvider>

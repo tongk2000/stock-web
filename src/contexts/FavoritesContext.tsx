@@ -17,6 +17,7 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
+import { STORAGE_KEYS } from '@/lib/constants';
 
 export interface FavoriteStock {
   code: string;
@@ -32,7 +33,7 @@ interface FavoritesContextType {
 
 const FavoritesContext = createContext<FavoritesContextType | null>(null);
 
-const STORAGE_KEY = 'stock-favorites';
+const STORAGE_KEY = STORAGE_KEYS.FAVORITES;
 
 function loadLocal(): FavoriteStock[] {
   try {

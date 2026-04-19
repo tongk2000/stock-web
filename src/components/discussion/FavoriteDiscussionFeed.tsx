@@ -13,6 +13,7 @@ import { ThumbsUp, Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { formatRelativeTime } from '@/lib/format';
+import { PAGE_SIZE } from '@/lib/constants';
 
 type Post = {
   id: string;
@@ -24,8 +25,6 @@ type Post = {
 };
 
 type ProfileInfo = { nickname: string; is_premium: boolean };
-
-const PAGE_SIZE = 15;
 
 export default function FavoriteDiscussionFeed() {
   const { favorites } = useFavorites();
@@ -51,7 +50,7 @@ export default function FavoriteDiscussionFeed() {
         .select('id, content, created_at, like_count, stock_code, user_id')
         .in('stock_code', codes)
         .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE);
+        .limit(PAGE_SIZE.FAVORITES);
       if (cursor) q = q.lt('created_at', cursor);
 
       const { data: postsData } = await q;
@@ -93,7 +92,7 @@ export default function FavoriteDiscussionFeed() {
       setProfileMap(
         new Map(profiles.map((p) => [p.id, { nickname: p.nickname, is_premium: p.is_premium }])),
       );
-      setHasMore(list.length === PAGE_SIZE);
+      setHasMore(list.length === PAGE_SIZE.FAVORITES);
       setLoading(false);
     })();
     return () => {
@@ -122,7 +121,7 @@ export default function FavoriteDiscussionFeed() {
       profiles.forEach((p) => next.set(p.id, { nickname: p.nickname, is_premium: p.is_premium }));
       return next;
     });
-    setHasMore(list.length === PAGE_SIZE);
+    setHasMore(list.length === PAGE_SIZE.FAVORITES);
     setLoadingMore(false);
   }, [loadingMore, hasMore, loading, posts, fetchPage]);
 

@@ -9,9 +9,10 @@
 
 import type { MetadataRoute } from 'next';
 import { createClient } from '@/lib/supabase/server';
+import { ENGAGEMENT_THRESHOLD } from '@/lib/constants';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-const ENGAGEMENT_THRESHOLD = 3;
+/** sitemap.xml이 너무 커지지 않도록 최근 글부터 상한까지만 포함 */
 const MAX_POSTS = 10000;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {

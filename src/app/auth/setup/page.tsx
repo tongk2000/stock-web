@@ -15,13 +15,14 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
+import { STORAGE_KEYS } from '@/lib/constants'
 
 function consumeNextPath(): string {
   if (typeof window === 'undefined') return '/'
   let raw: string | null = null
   try {
-    raw = sessionStorage.getItem('post-auth-next')
-    sessionStorage.removeItem('post-auth-next')
+    raw = sessionStorage.getItem(STORAGE_KEYS.POST_AUTH_NEXT)
+    sessionStorage.removeItem(STORAGE_KEYS.POST_AUTH_NEXT)
   } catch {}
   const target = raw ?? '/'
   // open redirect 방지 — 내부 경로만 허용

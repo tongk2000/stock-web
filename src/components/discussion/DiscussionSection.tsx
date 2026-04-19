@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import CommentSection from './CommentSection';
 import { formatRelativeTime } from '@/lib/format';
+import { PAGE_SIZE } from '@/lib/constants';
 
 type PostWithAuthor = {
   id: string;
@@ -27,8 +28,6 @@ interface Props {
   roomId: string;
   stockCode: string;
 }
-
-const PAGE_SIZE = 30;
 
 const POST_SELECT =
   'id, content, created_at, like_count, dislike_count, comment_count, user_id, profiles!posts_user_id_fkey(nickname, score, is_premium)';
@@ -68,12 +67,12 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       .select(POST_SELECT)
       .eq('room_id', roomId)
       .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE)
+      .limit(PAGE_SIZE.ROOM)
       .then(({ data }) => {
         if (cancelled) return;
         const list = (data as PostWithAuthor[]) ?? [];
         setPosts(list);
-        setHasMore(list.length === PAGE_SIZE);
+        setHasMore(list.length === PAGE_SIZE.ROOM);
         setLoading(false);
       });
     return () => {
@@ -94,14 +93,14 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       .eq('room_id', roomId)
       .lt('created_at', lastPost.created_at)
       .order('created_at', { ascending: false })
-      .limit(PAGE_SIZE);
+      .limit(PAGE_SIZE.ROOM);
     const list = (data as PostWithAuthor[]) ?? [];
     setPosts((prev) => {
       const seen = new Set(prev.map((p) => p.id));
       const next = list.filter((p) => !seen.has(p.id));
       return [...prev, ...next];
     });
-    setHasMore(list.length === PAGE_SIZE);
+    setHasMore(list.length === PAGE_SIZE.ROOM);
     setLoadingMore(false);
   }, [loadingMore, hasMore, loading, posts, roomId]);
 

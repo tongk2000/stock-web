@@ -6,7 +6,7 @@
  * 모든 종목의 최근 토론 게시글 피드 (무한 스크롤).
  *
  * - 검색어(`query` prop)는 URL 쿼리에서 전달됩니다. prop이 바뀌면 커서를 리셋하고 다시 로드합니다.
- * - 최신순으로 PAGE_SIZE씩 불러오고, 스크롤이 끝에 닿으면 다음 페이지를 이어 붙입니다.
+ * - 최신순으로 PAGE_SIZE.DEFAULT씩 불러오고, 스크롤이 끝에 닿으면 다음 페이지를 이어 붙입니다.
  * - 카드 클릭 시 토론글 상세 페이지(/discussions/[id])로 이동합니다.
  */
 
@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { formatRelativeTime } from '@/lib/format';
+import { PAGE_SIZE } from '@/lib/constants';
 
 type Post = {
   id: string;
@@ -26,8 +27,6 @@ type Post = {
 };
 
 type ProfileInfo = { nickname: string; is_premium: boolean };
-
-const PAGE_SIZE = 20;
 
 export default function DiscussionFeed({ query = '' }: { query?: string }) {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -46,7 +45,7 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
         .from('posts')
         .select('id, content, created_at, like_count, stock_code, user_id')
         .order('created_at', { ascending: false })
-        .limit(PAGE_SIZE);
+        .limit(PAGE_SIZE.DEFAULT);
       if (cursor) q = q.lt('created_at', cursor);
       if (query) {
         const escaped = query.replace(/([\\%_])/g, '\\$1');
@@ -90,7 +89,7 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
       setProfileMap(
         new Map(profiles.map((p) => [p.id, { nickname: p.nickname, is_premium: p.is_premium }])),
       );
-      setHasMore(list.length === PAGE_SIZE);
+      setHasMore(list.length === PAGE_SIZE.DEFAULT);
       setLoading(false);
     })();
     return () => {
@@ -119,7 +118,7 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
       profiles.forEach((p) => next.set(p.id, { nickname: p.nickname, is_premium: p.is_premium }));
       return next;
     });
-    setHasMore(list.length === PAGE_SIZE);
+    setHasMore(list.length === PAGE_SIZE.DEFAULT);
     setLoadingMore(false);
   }, [loadingMore, hasMore, loading, posts, fetchPage]);
 
