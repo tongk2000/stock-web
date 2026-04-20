@@ -55,6 +55,24 @@ export const STORAGE_KEYS = {
 export const MA_PERIODS = [5, 20, 60, 120] as const;
 
 /**
+ * TanStack Query 기본 staleTime (ms).
+ * 5분 동안은 동일 쿼리 키의 fetch를 재사용합니다.
+ * 캔들/종목 데이터가 실시간성이 낮아 이 정도로도 충분합니다.
+ */
+export const STALE_TIME_MS = 1000 * 60 * 5;
+
+/**
+ * 차트 메모 한 건당 입력 최대 글자수.
+ * textarea maxLength와 글자 카운터(`n / MEMO_MAX_LENGTH`) 양쪽에서 사용합니다.
+ */
+export const MEMO_MAX_LENGTH = 500;
+
+/**
+ * 댓글 한 건당 입력 최대 글자수.
+ */
+export const COMMENT_MAX_LENGTH = 500;
+
+/**
  * 랭킹 페이지(/rankings/*) 공용 상수.
  *
  * - PAGE_SIZE                  : 한 랭킹에 노출할 종목 수

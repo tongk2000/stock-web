@@ -1,11 +1,25 @@
 'use client';
 
+/**
+ * CommentSection
+ *
+ * 특정 게시글의 댓글 트리(최대 2레벨)를 표시·작성하는 컴포넌트입니다.
+ *
+ * - 원본 테이블은 부모-자식 계층이지만 UI는 "최상위 댓글 + 그 아래 답글" 2레벨만 보여줍니다.
+ *   답글에 대한 답글도 parent_id는 최상위를 가리키고 reply_to_user_id 만 타깃으로 가집니다.
+ * - Supabase Realtime(postgres_changes)로 INSERT/DELETE 를 실시간 반영합니다.
+ * - 조인 결과 프로필은 Supabase FK 추정에 따라 단일 객체 또는 1원소 배열로 오므로
+ *   `firstOrNull` 로 정규화합니다.
+ */
+
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
-import { cn } from '@/lib/utils';
+import { cn, firstOrNull } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/format';
+import { COMMENT_MAX_LENGTH } from '@/lib/constants';
+import { PremiumBadge } from '@/components/ui/badges';
 
 type CommentRow = {
   id: string;
@@ -40,11 +54,6 @@ const SELECT_COLS =
   'id, post_id, parent_id, user_id, reply_to_user_id, content, created_at, ' +
   'profiles!comments_user_id_fkey(nickname, is_premium), ' +
   'reply_to:profiles!comments_reply_to_user_id_fkey(nickname)';
-
-function firstOrNull<T>(v: T[] | T | null | undefined): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? (v[0] ?? null) : v;
-}
 
 function normalize(row: CommentRow): Comment {
   const p = firstOrNull(row.profiles);
@@ -259,7 +268,7 @@ export default function CommentSection({ postId }: Props) {
             }
             className="flex-1 resize-none rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
             rows={2}
-            maxLength={500}
+            maxLength={COMMENT_MAX_LENGTH}
             readOnly={!user}
           />
           <button
@@ -292,11 +301,7 @@ function CommentItem({
     <div>
       <div className="flex items-center gap-1.5">
         <span className="text-xs font-medium text-foreground">{comment.nickname}</span>
-        {comment.is_premium && (
-          <span className="rounded bg-amber-500/20 px-1 py-[1px] text-[9px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-            PRO
-          </span>
-        )}
+        {comment.is_premium && <PremiumBadge size="xs" />}
         <span className="text-[11px] text-muted-foreground">
           {formatRelativeTime(comment.created_at)}
         </span>

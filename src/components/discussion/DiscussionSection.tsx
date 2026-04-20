@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import CommentSection from './CommentSection';
+import { PremiumBadge } from '@/components/ui/badges';
 import { formatRelativeTime } from '@/lib/format';
 import { PAGE_SIZE } from '@/lib/constants';
 
@@ -334,11 +335,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                   <span className="text-sm font-medium text-foreground">
                     {profile?.nickname ?? '알 수 없음'}
                   </span>
-                  {profile?.is_premium && (
-                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-                      PRO
-                    </span>
-                  )}
+                  {profile?.is_premium && <PremiumBadge />}
                 </div>
                 <span className="shrink-0 text-xs text-muted-foreground">
                   {formatRelativeTime(post.created_at)}

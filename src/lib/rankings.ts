@@ -23,6 +23,7 @@ import type {
 
 type StockMeta = { code: string; name: string; market: 'KOSPI' | 'KOSDAQ' };
 
+/** 종목 코드 리스트에 대응하는 이름/시장 메타를 한 번에 조회해 Map으로 돌려줍니다. */
 async function fetchStockMeta(
   codes: string[],
 ): Promise<Map<string, StockMeta>> {
@@ -35,6 +36,7 @@ async function fetchStockMeta(
   return new Map((data ?? []).map((s) => [s.code, s as StockMeta]));
 }
 
+/** 등락률에서 "상승/하락/변화없음" 중 하나의 색상 톤 키를 산출합니다. */
 function toneFromChange(rate: number | null | undefined): 'up' | 'down' | 'neutral' {
   if (rate == null || rate === 0) return 'neutral';
   return rate > 0 ? 'up' : 'down';

@@ -11,26 +11,21 @@
  */
 
 import Link from 'next/link';
-import { ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
-import { formatRelativeTime } from '@/lib/format';
-import { cn } from '@/lib/utils';
+import { escapeIlike } from '@/lib/utils';
+import { PAGE_SIZE } from '@/lib/constants';
 import SearchForm from '@/components/search/SearchForm';
+import PostCard from '@/components/discussion/PostCard';
+import { MarketBadge } from '@/components/ui/badges';
+import type { PostListItem } from '@/types/discussion';
 
 export const metadata = { title: '검색' };
 
 const STOCK_LIMIT = 10;
-const POST_LIMIT = 20;
+// 검색 결과의 토론글 최대 표시 수 — 무한 스크롤 피드와 수를 맞춥니다.
+const POST_LIMIT = PAGE_SIZE.DEFAULT;
 
 type StockRow = { code: string; name: string; market: 'KOSPI' | 'KOSDAQ' };
-type PostRow = {
-  id: string;
-  content: string;
-  created_at: string;
-  like_count: number;
-  stock_code: string;
-  user_id: string;
-};
 
 export default async function SearchPage({
   searchParams,
@@ -55,7 +50,7 @@ export default async function SearchPage({
   }
 
   const supabase = await createClient();
-  const escaped = query.replace(/([\\%_])/g, '\\$1');
+  const escaped = escapeIlike(query);
 
   const [stocksRes, postsRes] = await Promise.all([
     supabase
@@ -72,11 +67,12 @@ export default async function SearchPage({
   ]);
 
   const stocks = (stocksRes.data ?? []) as StockRow[];
-  const posts = (postsRes.data ?? []) as PostRow[];
+  const posts = (postsRes.data ?? []) as PostListItem[];
 
   const stockCodes = [...new Set(posts.map((p) => p.stock_code))];
   const userIds = [...new Set(posts.map((p) => p.user_id))];
 
+  // 토론글 카드에 붙일 메타(종목명·작성자 프로필)를 병렬로 조회합니다.
   const [stockNameRes, profilesRes] = await Promise.all([
     stockCodes.length
       ? supabase.from('stocks').select('code, name').in('code', stockCodes)
@@ -131,16 +127,7 @@ export default async function SearchPage({
                   >
                     <span className="font-medium text-foreground">{s.name}</span>
                     <span className="text-sm text-muted-foreground">{s.code}</span>
-                    <span
-                      className={cn(
-                        'ml-auto rounded px-1.5 py-0.5 text-xs font-semibold',
-                        s.market === 'KOSPI'
-                          ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-                      )}
-                    >
-                      {s.market}
-                    </span>
+                    <MarketBadge market={s.market} className="ml-auto" />
                   </Link>
                 </li>
               ))}
@@ -164,44 +151,14 @@ export default async function SearchPage({
             </p>
           ) : (
             <div className="space-y-2">
-              {posts.map((post) => {
-                const profile = profileMap.get(post.user_id);
-                return (
-                  <Link
-                    key={post.id}
-                    href={`/discussions/${post.id}`}
-                    className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
-                  >
-                    <div className="mb-1.5 flex items-center justify-between gap-2">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
-                          {stockNameMap.get(post.stock_code) ?? post.stock_code}
-                        </span>
-                        <span className="truncate text-sm font-medium text-foreground">
-                          {profile?.nickname ?? '알 수 없음'}
-                        </span>
-                        {profile?.is_premium && (
-                          <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-                            PRO
-                          </span>
-                        )}
-                      </div>
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatRelativeTime(post.created_at)}
-                      </span>
-                    </div>
-                    <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-foreground">
-                      {post.content}
-                    </p>
-                    {post.like_count > 0 && (
-                      <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                        <ThumbsUp size={11} />
-                        <span>{post.like_count}</span>
-                      </div>
-                    )}
-                  </Link>
-                );
-              })}
+              {posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  stockName={stockNameMap.get(post.stock_code)}
+                  profile={profileMap.get(post.user_id)}
+                />
+              ))}
               {hasMorePosts && (
                 <Link
                   href={`/discussions?q=${encodeURIComponent(query)}`}

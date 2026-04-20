@@ -14,6 +14,8 @@ import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import CommentSection from '@/components/discussion/CommentSection';
 import PostLikeButtons from '@/components/discussion/PostLikeButtons';
+import { PremiumBadge } from '@/components/ui/badges';
+import { firstOrNull } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/format';
 import { ENGAGEMENT_THRESHOLD } from '@/lib/constants';
 
@@ -36,11 +38,7 @@ type PostRow = {
     | null;
 };
 
-function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? (v[0] ?? null) : v;
-}
-
+/** DB 조회 결과가 null이면 그대로 null을 반환하고, 있으면 연관 종목 정보까지 함께 로드합니다. */
 async function fetchPostWithStock(id: string) {
   const supabase = await createClient();
   const { data: post } = await supabase
@@ -64,6 +62,7 @@ async function fetchPostWithStock(id: string) {
   return { post: row, stock: (stock as { name: string; market: string } | null) ?? null };
 }
 
+/** 좋아요나 댓글이 `ENGAGEMENT_THRESHOLD` 이상이면 검색엔진 색인을 허용합니다. */
 function isIndexable(post: PostRow) {
   return post.like_count >= ENGAGEMENT_THRESHOLD || post.comment_count >= ENGAGEMENT_THRESHOLD;
 }
@@ -127,11 +126,7 @@ export default async function PostDetailPage({ params }: Props) {
             <h1 className="text-sm font-medium text-foreground">
               {profile?.nickname ?? '알 수 없음'}
             </h1>
-            {profile?.is_premium && (
-              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-                PRO
-              </span>
-            )}
+            {profile?.is_premium && <PremiumBadge />}
             <time className="text-xs text-muted-foreground" dateTime={post.created_at}>
               {formatRelativeTime(post.created_at)}
             </time>
