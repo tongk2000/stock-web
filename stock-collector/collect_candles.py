@@ -7,14 +7,15 @@ KOSPI·KOSDAQ 전 종목의 일봉 데이터를 증분 수집합니다.
 흐름:
   1. 거래소(KRX/NXT)별 마지막 저장 날짜 조회
   2. 상장사 목록 가져와 stocks 테이블 upsert
-  3. 각 종목의 미수집 기간 일봉을 FinanceDataReader로 조회
-  4. candles 테이블에 upsert (중복 시 덮어쓰기)
+  3. 각 종목의 미수집 기간 일봉을 FinanceDataReader로 병렬 조회
+  4. rows를 버퍼에 모아 배치 단위로 candles 테이블에 upsert
 
 환경 변수:
   - SUPABASE_URL             : Supabase 프로젝트 URL
   - SUPABASE_SERVICE_ROLE_KEY : service_role 키 (RLS 우회)
 """
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
 import FinanceDataReader as fdr
@@ -22,6 +23,11 @@ import FinanceDataReader as fdr
 from _utils import chunked_upsert, get_last_business_day, get_supabase
 
 supabase = get_supabase()
+
+# GitHub Actions 러너(미국 리전)에서 KRX/네이버까지 왕복 지연이 크기 때문에
+# fetch만 스레드로 병렬화한다. DB 쓰기는 배치로 모아 처리.
+FETCH_WORKERS = 12
+UPSERT_BATCH = 1000
 
 
 def last_business_day_str():
@@ -63,13 +69,13 @@ def upsert_stocks(stocks: list, market: str):
     chunked_upsert(supabase, "stocks", rows, on_conflict="code")
 
 
-def collect_candles(code: str, exchange: str, from_date: str, to_date: str):
-    """일봉 수집 후 Supabase 저장"""
+def fetch_candles(code: str, exchange: str, from_date: str, to_date: str) -> list[dict]:
+    """단일 종목 일봉 fetch (DB 쓰기 없음). 실패 시 빈 리스트."""
     try:
         source = f"{code}:NXT" if exchange == "NXT" else code
         df = fdr.DataReader(source, from_date, to_date)
         if df.empty:
-            return 0
+            return []
 
         rows = []
         for date, row in df.iterrows():
@@ -84,16 +90,23 @@ def collect_candles(code: str, exchange: str, from_date: str, to_date: str):
                 "close": int(row["Close"]),
                 "volume": int(row["Volume"]),
             })
-
-        if rows:
-            supabase.table("candles").upsert(
-                rows, on_conflict="stock_code,exchange,candle_type,date"
-            ).execute()
-
-        return len(rows)
+        return rows
     except Exception as e:
         print(f"  [{code}:{exchange}] 오류: {e}")
-        return 0
+        return []
+
+
+def flush_candles(rows: list[dict]) -> None:
+    """candles 배치 upsert."""
+    if not rows:
+        return
+    chunked_upsert(
+        supabase,
+        "candles",
+        rows,
+        on_conflict="stock_code,exchange,candle_type,date",
+        chunk=UPSERT_BATCH,
+    )
 
 
 def run(exchange: str, markets: list[str]):
@@ -118,13 +131,29 @@ def run(exchange: str, markets: list[str]):
             print(f"  {market} 목록 오류: {e}")
 
     total = len(stocks)
-    for i, s in enumerate(stocks, 1):
-        code = s["code"]
-        name = s["name"]
-        count = collect_candles(code, exchange, from_date, to_date)
-        print(f"  [{i}/{total}] {name}({code}): {count}개")
+    buffer: list[dict] = []
+    total_rows = 0
 
-    print(f"[{exchange}] 완료!")
+    with ThreadPoolExecutor(max_workers=FETCH_WORKERS) as pool:
+        futures = {
+            pool.submit(fetch_candles, s["code"], exchange, from_date, to_date): s
+            for s in stocks
+        }
+
+        # as_completed 루프는 메인 스레드 단독이므로 버퍼에 락 불필요.
+        for done, fut in enumerate(as_completed(futures), 1):
+            s = futures[fut]
+            rows = fut.result()
+            if rows:
+                buffer.extend(rows)
+                total_rows += len(rows)
+            if len(buffer) >= UPSERT_BATCH:
+                flush_candles(buffer)
+                buffer = []
+            print(f"  [{done}/{total}] {s['name']}({s['code']}): {len(rows)}개")
+
+    flush_candles(buffer)
+    print(f"[{exchange}] 완료! 총 {total_rows}행 upsert")
 
 
 def main():
