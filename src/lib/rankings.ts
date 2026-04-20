@@ -345,6 +345,89 @@ export async function getFloatVolumeRanking(
   }));
 }
 
+// ============================================================
+// 섹터 랭킹
+// ============================================================
+
+export type SectorRankingRow = {
+  sector: string;
+  stock_count: number;
+  up_count: number;
+  down_count: number;
+  avg_change: number | null;
+  total_value: number | null;
+  weighted_change: number | null;
+};
+
+export type SectorSort = 'weighted_change' | 'total_value';
+
+export async function getSectorRanking(
+  sort: SectorSort = 'weighted_change',
+): Promise<SectorRankingRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from('v_sector_ranking')
+    .select(
+      'sector, stock_count, up_count, down_count, avg_change, total_value, weighted_change',
+    )
+    .not(sort, 'is', null)
+    .order(sort, { ascending: false });
+
+  return (data ?? []) as SectorRankingRow[];
+}
+
+/** 특정 섹터에 속한 종목들의 오늘 변화율 리스트 */
+export async function getSectorConstituents(
+  sector: string,
+  limit: number = RANKING.PAGE_SIZE,
+): Promise<RankingTableRow[]> {
+  const supabase = await createClient();
+
+  const { data: stocks } = await supabase
+    .from('stocks')
+    .select('code, name, market')
+    .eq('sector', sector);
+
+  const codes = (stocks ?? []).map((s) => s.code);
+  if (codes.length === 0) return [];
+
+  const { data: changes } = await supabase
+    .from('v_daily_change')
+    .select('stock_code, today_close, today_value, change_rate')
+    .in('stock_code', codes);
+
+  const changeMap = new Map(
+    ((changes ?? []) as Pick<
+      DailyChangeRow,
+      'stock_code' | 'today_close' | 'today_value' | 'change_rate'
+    >[]).map((c) => [c.stock_code, c]),
+  );
+
+  return (stocks ?? [])
+    .map<RankingTableRow | null>((s) => {
+      const ch = changeMap.get(s.code);
+      if (!ch) return null;
+      return {
+        code: s.code,
+        name: s.name,
+        market: s.market as 'KOSPI' | 'KOSDAQ',
+        metric: formatPercent(ch.change_rate),
+        metricTone: toneFromChange(ch.change_rate),
+        secondary: [
+          { label: '종가', value: `${formatNumber(ch.today_close)}원` },
+          { label: '거래대금', value: formatKRWCompact(ch.today_value) },
+        ],
+      };
+    })
+    .filter((r): r is RankingTableRow => r !== null)
+    .sort((a, b) => {
+      const av = parseFloat(a.metric);
+      const bv = parseFloat(b.metric);
+      return (isNaN(bv) ? 0 : bv) - (isNaN(av) ? 0 : av);
+    })
+    .slice(0, limit);
+}
+
 export async function getValuationRanking(
   tab: ValuationTab,
   limit: number = RANKING.PAGE_SIZE,
