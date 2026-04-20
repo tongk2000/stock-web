@@ -15,26 +15,18 @@ KOSPI·KOSDAQ 전 종목의 일봉 데이터를 증분 수집합니다.
   - SUPABASE_SERVICE_ROLE_KEY : service_role 키 (RLS 우회)
 """
 
-import os
 from datetime import datetime, timedelta
-from dotenv import load_dotenv
+
 import FinanceDataReader as fdr
-from supabase import create_client
 
-load_dotenv()
+from _utils import chunked_upsert, get_last_business_day, get_supabase
 
-supabase = create_client(
-    os.environ["SUPABASE_URL"],
-    os.environ["SUPABASE_SERVICE_ROLE_KEY"],
-)
+supabase = get_supabase()
 
 
-def get_last_business_day():
-    """가장 최근 영업일"""
-    d = datetime.now()
-    while d.weekday() >= 5:
-        d -= timedelta(days=1)
-    return d.strftime("%Y-%m-%d")
+def last_business_day_str():
+    """가장 최근 영업일 (YYYY-MM-DD)"""
+    return get_last_business_day().strftime("%Y-%m-%d")
 
 
 def get_from_date(exchange: str):
@@ -68,8 +60,7 @@ def get_listed_stocks(market_key: str):
 def upsert_stocks(stocks: list, market: str):
     """종목 목록 upsert"""
     rows = [{"code": s["code"], "name": s["name"], "market": market} for s in stocks]
-    for i in range(0, len(rows), 500):
-        supabase.table("stocks").upsert(rows[i:i+500], on_conflict="code").execute()
+    chunked_upsert(supabase, "stocks", rows, on_conflict="code")
 
 
 def collect_candles(code: str, exchange: str, from_date: str, to_date: str):
@@ -107,7 +98,7 @@ def collect_candles(code: str, exchange: str, from_date: str, to_date: str):
 
 def run(exchange: str, markets: list[str]):
     """거래소별 수집 실행"""
-    to_date = get_last_business_day()
+    to_date = last_business_day_str()
     from_date = get_from_date(exchange)
 
     if from_date > to_date:
