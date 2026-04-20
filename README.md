@@ -22,16 +22,29 @@ src/
 ├── app/                            # Next.js App Router
 │   ├── layout.tsx                  # 루트 레이아웃
 │   │                               #   ThemeProvider > AuthProvider > FavoritesProvider > SidebarProvider
-│   │                               #   AppHeader + LeftNav + {children}
-│   ├── page.tsx                    # 홈 (검색 안내 페이지)
+│   │                               #   > QueryProvider. AppHeader + LeftNav + {children}
+│   ├── page.tsx                    # 홈 (즐겨찾기 가격 + 즐겨찾기 토론 피드)
 │   ├── sitemap.ts                  # 동적 sitemap.xml (종목 + 참여도 높은 토론글)
 │   ├── robots.ts                   # robots.txt (+ sitemap 참조, /auth 차단)
 │   ├── auth/
 │   │   ├── callback/route.ts       # OAuth 콜백 (세션 교환 + 온보딩 분기)
+│   │   ├── return/page.tsx         # 로그인 후 복귀 (sessionStorage 경로로 replace)
 │   │   └── setup/page.tsx          # 닉네임 설정 (신규 가입 온보딩)
 │   ├── discussions/
 │   │   ├── page.tsx                # 토론방 피드 (전체 최신글, 무한 스크롤)
 │   │   └── [id]/page.tsx           # 토론글 상세 (SSR, SEO용 영속 링크)
+│   ├── rankings/                   # 종목 랭킹 페이지군
+│   │   ├── page.tsx                # 허브 (4종 미리보기 카드)
+│   │   ├── volume/page.tsx         # 거래대금·거래량 급증
+│   │   ├── movers/page.tsx         # 상승·하락·52주 신고가·신저가
+│   │   ├── valuation/page.tsx      # 시가총액·PER·PBR·ROE
+│   │   ├── trending/page.tsx       # 토론 참여 급증
+│   │   ├── float-volume/page.tsx   # 유동물량 대비 거래량 (지수 구성종목)
+│   │   └── sectors/                # 섹터 랭킹 + 드릴다운
+│   │       ├── page.tsx
+│   │       └── [name]/page.tsx
+│   ├── search/
+│   │   └── page.tsx                # 통합 검색 (종목 + 토론글, SSR)
 │   └── stocks/[code]/
 │       ├── page.tsx                # 종목 상세 (차트 + 즐겨찾기 + 토론방)
 │       └── loading.tsx             # 로딩 스켈레톤
@@ -43,45 +56,56 @@ src/
 │   ├── chart/
 │   │   └── CandleChart.tsx         # TradingView Lightweight Charts 래퍼
 │   ├── discussion/
-│   │   └── DiscussionSection.tsx   # 종목별 토론방 (실시간 구독)
+│   │   ├── DiscussionFeed.tsx         # 전체/검색어 기반 토론 피드
+│   │   ├── FavoriteDiscussionFeed.tsx # 즐겨찾기 종목 토론 피드
+│   │   ├── DiscussionSearchForm.tsx   # 정적 HTML 검색 폼
+│   │   ├── DiscussionSection.tsx      # 종목별 토론방 (실시간 구독)
+│   │   ├── CommentSection.tsx         # 2레벨 댓글 (실시간 INSERT/DELETE)
+│   │   ├── PostLikeButtons.tsx        # 게시글 좋아요/싫어요 (실시간 UPDATE)
+│   │   └── PostCard.tsx               # 피드/검색 공용 카드
+│   ├── search/
+│   │   └── SearchForm.tsx          # 정적 HTML 검색 폼
 │   ├── stock/
 │   │   ├── StockSearch.tsx         # 종목 검색 자동완성
 │   │   ├── StockChartSection.tsx   # 차트 영역 (가격·컨트롤·메모 모달)
-│   │   └── FavoriteButton.tsx      # 즐겨찾기 토글 버튼
-│   └── ui/                         # shadcn/ui 컴포넌트
+│   │   ├── FavoriteButton.tsx      # 즐겨찾기 토글 버튼
+│   │   ├── FavoriteStockPrices.tsx # 홈 즐겨찾기 가격 그리드
+│   │   ├── RankingTable.tsx        # 공용 랭킹 리스트 (RSC)
+│   │   └── RankingTabs.tsx         # URL 기반 탭바 (무 JS)
+│   ├── theme-provider.tsx          # 다크/라이트/시스템 테마
+│   └── ui/                         # shadcn/ui + 공용 뱃지(PremiumBadge/MarketBadge)
 ├── contexts/
 │   ├── AuthContext.tsx             # Supabase Auth 전역 상태
 │   ├── FavoritesContext.tsx        # 즐겨찾기 (로그인: Supabase / 비로그인: localStorage)
 │   └── SidebarContext.tsx          # 사이드바 열림 상태 (AppHeader ↔ LeftNav 공유)
 ├── hooks/
-│   ├── useIsDark.ts               # 다크모드 여부 (MutationObserver)
-│   └── useScrollAtTop.ts          # 스크롤 방향 기반 헤더 표시 제어
+│   ├── useIsDark.ts                # 다크모드 여부 (MutationObserver)
+│   ├── useInfinitePosts.ts         # 커서 기반 무한 스크롤 (피드 공용)
+│   └── useScrollAtTop.ts           # 스크롤 방향 기반 헤더 표시 제어
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts              # 클라이언트 컴포넌트용 Supabase 클라이언트
 │   │   └── server.ts              # 서버 컴포넌트용 Supabase 클라이언트
-│   ├── format.ts                  # 공통 포맷 유틸 (상대 시간 등)
+│   ├── constants.ts               # 페이지 사이즈, 스토리지 키, 임계값 등 전역 상수
+│   ├── format.ts                  # 공통 포맷 유틸 (상대 시간, 원화 축약, % 등)
 │   ├── indicators.ts              # 기술적 지표 계산 (MA, BB, RSI, OBV, 봉 집계)
 │   ├── query-client.ts            # TanStack Query 설정 (staleTime 5분)
-│   └── utils.ts                   # cn() 등 범용 유틸
+│   ├── rankings.ts                # 랭킹 페이지용 Supabase 쿼리
+│   └── utils.ts                   # cn / firstOrNull / escapeIlike 등 범용 유틸
 └── types/
+    ├── ranking.ts                 # RankingRow, ExtremesRow 등 랭킹 타입
     ├── stock.ts                   # Stock, Candle, CandleType
-    └── discussion.ts              # Post, DiscussionRoom
+    └── discussion.ts              # Post, DiscussionRoom, PostListItem, ProfileInfo
 
-stock-collector/                    # Python 데이터 수집 스크립트
-├── collect_candles.py              # 일봉 수집 (FinanceDataReader → Supabase)
+stock-collector/                    # Python 데이터 수집 스크립트 (프런트엔드와 독립)
+├── _utils.py                       # 공용 Supabase 클라이언트 / 배치 헬퍼
+├── collect_candles.py              # 일봉 수집 (FinanceDataReader → Supabase, 병렬)
 ├── collect_financials.py           # 분기 재무 수집 (DART OpenAPI → Supabase)
+├── collect_short_balances.py       # 공매도 잔고 수집
 └── requirements.txt
 
 supabase/
-└── migrations/                     # DB 마이그레이션 (순서대로 적용)
-    ├── 20260413000001_init_schema.sql       # 초기 스키마 + RLS
-    ├── 20260413000002_add_financials.sql    # 재무 정보 테이블
-    ├── 20260414000001_add_exchange_to_candles.sql  # 거래소(KRX/NXT) 컬럼
-    ├── 20260415000001_add_public_chart_notes.sql   # 차트 메모 프로토타입용 수정
-    ├── 20260416000001_add_onboarded.sql     # 온보딩 플래그
-    ├── 20260416000002_favorites_and_memo_fix.sql   # 즐겨찾기 테이블 + 메모 unique
-    └── 20260416000003_discussion_setup.sql  # 토론방 자동 생성 + 좋아요 + Realtime
+└── migrations/                     # DB 마이그레이션 (파일명 시간 prefix 순서로 적용)
 ```
 
 ## 레이아웃 구조
@@ -159,12 +183,20 @@ cp .env.example .env.local
 [supabase.com](https://supabase.com) 에서 프로젝트 생성 후 `Settings > API`에서 키 복사:
 
 ```env
+# 사이트 절대 URL (sitemap/robots/canonical 생성용) — 배포 시 실제 도메인으로
+NEXT_PUBLIC_SITE_URL=http://localhost:3000
+
+# Supabase
 NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 ```
 
+> `SUPABASE_SERVICE_ROLE_KEY`는 **서버 전용**입니다. 클라이언트 번들에 포함되지 않도록 접두사 `NEXT_PUBLIC_`을 붙이지 마세요.
+
 ### 3. DB 마이그레이션 적용
+
+Supabase CLI가 필요합니다 ([설치 가이드](https://supabase.com/docs/guides/cli)). 설치 후:
 
 ```bash
 supabase link --project-ref <프로젝트-ref>
@@ -173,10 +205,30 @@ supabase db push
 
 프로젝트 ref는 대시보드 URL에서 확인: `https://supabase.com/dashboard/project/<ref>`
 
+**Realtime 활성화**: `posts`, `comments` 테이블에 대해 Supabase Dashboard → Database → Replication에서 Realtime이 켜져 있어야 실시간 구독(댓글/좋아요/새 글)이 동작합니다. 마이그레이션에 포함되지 않은 대시보드 설정이므로 최초 1회 직접 확인하세요.
+
 ### 4. 개발 서버 실행
 
 ```bash
-npm run dev
+npm run dev         # 개발 서버 (http://localhost:3000)
+npm run lint        # ESLint (PR 제출 전 권장)
+npm run build       # 프로덕션 빌드 (타입체크 포함)
+```
+
+### 5. 데이터 수집기(Python, 선택)
+
+일봉/재무/공매도 잔고 수집기는 `stock-collector/` 디렉터리에 있습니다. 프런트엔드와 독립 실행이므로 개발 중에는 굳이 띄우지 않아도 됩니다.
+
+```bash
+cd stock-collector
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+
+# 환경 변수: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY 필요
+# 재무 수집은 DART_API_KEY 추가로 필요 (https://opendart.fss.or.kr/ 발급)
+python collect_candles.py        # 일봉 upsert (KRX/NXT)
+python collect_financials.py     # 분기 연결재무제표 upsert
+python collect_short_balances.py # 공매도 잔고 upsert
 ```
 
 ## 구독 모델

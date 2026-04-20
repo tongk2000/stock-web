@@ -30,7 +30,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
 import { aggregateCandles } from '@/lib/indicators';
-import { STORAGE_KEYS, MA_PERIODS } from '@/lib/constants';
+import { STORAGE_KEYS, MA_PERIODS, MEMO_MAX_LENGTH } from '@/lib/constants';
 import type { Candle, CandleType } from '@/types/stock';
 import type { IndicatorOptions } from '@/components/chart/CandleChart';
 
@@ -55,8 +55,6 @@ const MA_COLORS: Record<number, string> = {
   120: '#16a34a',
 };
 
-const STORAGE_KEY = STORAGE_KEYS.INDICATORS;
-
 const DEFAULT_INDICATORS: IndicatorOptions = {
   volume: true,
   ma: [5, 20, 60, 120],
@@ -66,10 +64,11 @@ const DEFAULT_INDICATORS: IndicatorOptions = {
   tooltip: true,
 };
 
+/** localStorage에서 보조지표 설정을 복원합니다. 파싱 실패·서버 사이드일 때는 기본값. */
 function loadIndicators(): IndicatorOptions {
   if (typeof window === 'undefined') return DEFAULT_INDICATORS;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(STORAGE_KEYS.INDICATORS);
     if (!raw) return DEFAULT_INDICATORS;
     return { ...DEFAULT_INDICATORS, ...JSON.parse(raw) };
   } catch {
@@ -137,7 +136,9 @@ function ToggleBtn({
 }
 
 export default function StockChartSection({ code }: Props) {
-  const { signInWithGoogle } = useAuth();
+  // AuthContext를 구독하면 이 컴포넌트에서 별도로 onAuthStateChange 리스너를 둘 필요가 없습니다.
+  const { user, signInWithGoogle } = useAuth();
+  const userId = user?.id ?? null;
   const isDark = useIsDark();
   const [exchange, setExchange] = useState<ExchangeType>('통합');
   const [candleType, setCandleType] = useState<CandleType>('daily');
@@ -152,22 +153,11 @@ export default function StockChartSection({ code }: Props) {
   const [initialized, setInitialized] = useState(false);
 
   // ── 메모 상태 ─────────────────────────────────────────────────────────────────
-  const [userId, setUserId] = useState<string | null>(null);
   const [memoRecord, setMemoRecord] = useState<Record<string, string>>({});
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [memoInput, setMemoInput] = useState('');
 
   const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
-
-  // 로그인 유저 ID 확인
-  useEffect(() => {
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setUserId(data.user?.id ?? null));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_, session) => {
-      setUserId(session?.user?.id ?? null);
-    });
-    return () => subscription.unsubscribe();
-  }, []);
 
   // hydration 후 localStorage 복원 (SSR 불일치 방지)
   useEffect(() => {
@@ -198,7 +188,7 @@ export default function StockChartSection({ code }: Props) {
   // 초기화 완료 후에만 저장 (마운트 직후 DEFAULT로 덮어쓰는 버그 방지)
   useEffect(() => {
     if (!initialized) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(indicators));
+    localStorage.setItem(STORAGE_KEYS.INDICATORS, JSON.stringify(indicators));
   }, [initialized, indicators]);
 
   // 캔들 데이터 fetch
@@ -492,12 +482,12 @@ export default function StockChartSection({ code }: Props) {
               placeholder="이 날의 메모를 입력하세요..."
               className="w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-base text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               rows={4}
-              maxLength={500}
+              maxLength={MEMO_MAX_LENGTH}
               autoFocus
             />
 
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">{memoInput.length} / 500</span>
+              <span className="text-xs text-muted-foreground">{memoInput.length} / {MEMO_MAX_LENGTH}</span>
               <div className="flex gap-2">
                 {memoRecord[selectedDate] && (
                   <button

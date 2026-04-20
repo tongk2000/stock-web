@@ -36,6 +36,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [nickname, setNickname] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
+  /** profiles 테이블에서 닉네임을 조회해 상태에 반영합니다. 프로필이 없으면 null. */
   async function fetchNickname(userId: string) {
     const supabase = createClient()
     const { data } = await supabase
@@ -67,15 +68,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  /**
+   * Google OAuth 로그인 시작.
+   *
+   * `next` 는 로그인 성공 후 돌아갈 내부 경로입니다. 지정하지 않으면 현재 위치로 복귀합니다.
+   * `/auth/*` 자체에서 호출된 경우 루프 방지를 위해 홈(`/`)으로 돌려보냅니다.
+   *
+   * 복귀 경로는 `redirectTo` 쿼리에 넣지 않고 sessionStorage에 저장합니다.
+   * Supabase가 허용하는 리다이렉트 URL은 정확 일치로 검증되기 때문에 쿼리 파라미터가
+   * 붙으면 매칭에 실패해 Site URL(로컬호스트 등)로 폴백되는 문제가 있기 때문입니다.
+   * 실제 복귀는 `/auth/return` 페이지가 sessionStorage를 읽어 처리합니다.
+   *
+   * `safeNext` 는 `//evil.com` 같은 프로토콜 상대 URL을 차단해 open-redirect를 막습니다.
+   */
   const signInWithGoogle = async (next?: string) => {
     const supabase = createClient()
-    // 로그인 후 돌아갈 경로 — 인자로 받거나 현재 페이지를 기본값으로 사용
     const current = `${location.pathname}${location.search}${location.hash}`
-    // /auth/* 경로에서 로그인 시에는 복귀 경로로 삼지 않음 (콜백/셋업 재진입 방지)
     const target = next ?? (location.pathname.startsWith('/auth/') ? '/' : current)
     const safeNext = target.startsWith('/') && !target.startsWith('//') ? target : '/'
-    // redirectTo에 쿼리를 붙이면 Supabase 허용 redirect URL 매칭에서 제외돼
-    // Site URL(로컬호스트 등)로 폴백될 수 있으므로, 복귀 경로는 sessionStorage에 저장
     try {
       sessionStorage.setItem(STORAGE_KEYS.POST_AUTH_NEXT, safeNext)
     } catch {}

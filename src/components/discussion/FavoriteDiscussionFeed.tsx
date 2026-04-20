@@ -4,45 +4,30 @@
  * FavoriteDiscussionFeed
  *
  * 즐겨찾기한 종목들의 최근 토론글을 최신순으로 보여줍니다.
- * 무한 스크롤로 불러오며, 즐겨찾기가 없거나 글이 없으면 안내 문구를 표시합니다.
+ * 무한 스크롤·카드 렌더링은 각각 `useInfinitePosts` 훅과 `PostCard` 컴포넌트로 공유합니다.
+ * 즐겨찾기가 없으면 안내 문구만 표시합니다.
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { ThumbsUp, Star } from 'lucide-react';
+import { useCallback } from 'react';
+import { Star } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/contexts/FavoritesContext';
-import { formatRelativeTime } from '@/lib/format';
 import { PAGE_SIZE } from '@/lib/constants';
-
-type Post = {
-  id: string;
-  content: string;
-  created_at: string;
-  like_count: number;
-  stock_code: string;
-  user_id: string;
-};
-
-type ProfileInfo = { nickname: string; is_premium: boolean };
+import { useInfinitePosts, type FetchPageResult } from '@/hooks/useInfinitePosts';
+import PostCard from './PostCard';
+import type { PostListItem } from '@/types/discussion';
 
 export default function FavoriteDiscussionFeed() {
   const { favorites } = useFavorites();
-  const codes = favorites.map((f) => f.code);
-  const codesKey = codes.join(',');
-
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [stockMap, setStockMap] = useState<Map<string, string>>(new Map());
-  const [profileMap, setProfileMap] = useState<Map<string, ProfileInfo>>(new Map());
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
-  const sentinelRef = useRef<HTMLDivElement>(null);
+  // 즐겨찾기 목록이 바뀌었을 때 `fetchPage` identity를 바꿔
+  // useInfinitePosts가 커서를 리셋하도록 코드 배열을 문자열로 만들어 deps에 사용합니다.
+  const codesKey = favorites.map((f) => f.code).join(',');
 
   const fetchPage = useCallback(
-    async (cursor: string | null) => {
+    async (cursor: string | null): Promise<FetchPageResult> => {
+      const codes = codesKey ? codesKey.split(',') : [];
       if (codes.length === 0) {
-        return { list: [] as Post[], stocks: [], profiles: [] };
+        return { list: [], stocks: [], profiles: [] };
       }
       const supabase = createClient();
       let q = supabase
@@ -54,7 +39,7 @@ export default function FavoriteDiscussionFeed() {
       if (cursor) q = q.lt('created_at', cursor);
 
       const { data: postsData } = await q;
-      const list = (postsData ?? []) as Post[];
+      const list = (postsData ?? []) as PostListItem[];
       const stockCodes = [...new Set(list.map((p) => p.stock_code))];
       const userIds = [...new Set(list.map((p) => p.user_id))];
 
@@ -75,68 +60,15 @@ export default function FavoriteDiscussionFeed() {
         profiles: profilesRes.data ?? [],
       };
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [codesKey],
   );
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    setPosts([]);
-    setHasMore(true);
-    (async () => {
-      const { list, stocks, profiles } = await fetchPage(null);
-      if (cancelled) return;
-      setPosts(list);
-      setStockMap(new Map(stocks.map((s) => [s.code, s.name])));
-      setProfileMap(
-        new Map(profiles.map((p) => [p.id, { nickname: p.nickname, is_premium: p.is_premium }])),
-      );
-      setHasMore(list.length === PAGE_SIZE.FAVORITES);
-      setLoading(false);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [fetchPage]);
-
-  const loadMore = useCallback(async () => {
-    if (loadingMore || !hasMore || loading) return;
-    const lastPost = posts[posts.length - 1];
-    if (!lastPost) return;
-    setLoadingMore(true);
-    const { list, stocks, profiles } = await fetchPage(lastPost.created_at);
-    setPosts((prev) => {
-      const seen = new Set(prev.map((p) => p.id));
-      const next = list.filter((p) => !seen.has(p.id));
-      return [...prev, ...next];
+  const { posts, stockMap, profileMap, loading, loadingMore, hasMore, sentinelRef } =
+    useInfinitePosts({
+      pageSize: PAGE_SIZE.FAVORITES,
+      fetchPage,
+      enabled: favorites.length > 0,
     });
-    setStockMap((prev) => {
-      const next = new Map(prev);
-      stocks.forEach((s) => next.set(s.code, s.name));
-      return next;
-    });
-    setProfileMap((prev) => {
-      const next = new Map(prev);
-      profiles.forEach((p) => next.set(p.id, { nickname: p.nickname, is_premium: p.is_premium }));
-      return next;
-    });
-    setHasMore(list.length === PAGE_SIZE.FAVORITES);
-    setLoadingMore(false);
-  }, [loadingMore, hasMore, loading, posts, fetchPage]);
-
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) loadMore();
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore]);
 
   if (favorites.length === 0) {
     return (
@@ -169,46 +101,14 @@ export default function FavoriteDiscussionFeed() {
 
   return (
     <div className="space-y-2">
-      {posts.map((post) => {
-        const profile = profileMap.get(post.user_id);
-        return (
-          <Link
-            key={post.id}
-            href={`/discussions/${post.id}`}
-            className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
-          >
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <div className="flex min-w-0 items-center gap-2">
-                <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
-                  {stockMap.get(post.stock_code) ?? post.stock_code}
-                </span>
-                <span className="truncate text-sm font-medium text-foreground">
-                  {profile?.nickname ?? '알 수 없음'}
-                </span>
-                {profile?.is_premium && (
-                  <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-                    PRO
-                  </span>
-                )}
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {formatRelativeTime(post.created_at)}
-              </span>
-            </div>
-
-            <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-foreground">
-              {post.content}
-            </p>
-
-            {post.like_count > 0 && (
-              <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                <ThumbsUp size={11} />
-                <span>{post.like_count}</span>
-              </div>
-            )}
-          </Link>
-        );
-      })}
+      {posts.map((post) => (
+        <PostCard
+          key={post.id}
+          post={post}
+          stockName={stockMap.get(post.stock_code)}
+          profile={profileMap.get(post.user_id)}
+        />
+      ))}
 
       {hasMore && (
         <div ref={sentinelRef} className="flex justify-center py-4">

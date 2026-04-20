@@ -35,6 +35,11 @@ const FavoritesContext = createContext<FavoritesContextType | null>(null);
 
 const STORAGE_KEY = STORAGE_KEYS.FAVORITES;
 
+// 비로그인 사용자의 즐겨찾기는 브라우저 localStorage에만 남깁니다.
+// 로그인 시점에 서버와 병합한 뒤 비웁니다. try/catch는 Safari private mode 등에서
+// localStorage 접근이 금지된 환경을 조용히 무시하기 위한 것입니다.
+
+/** 비로그인 상태의 즐겨찾기 목록을 localStorage에서 읽어옵니다. 실패 시 빈 배열. */
 function loadLocal(): FavoriteStock[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -44,12 +49,14 @@ function loadLocal(): FavoriteStock[] {
   }
 }
 
+/** 비로그인 상태의 즐겨찾기 목록을 localStorage에 저장합니다. 저장소가 막혔으면 무시. */
 function saveLocal(list: FavoriteStock[]) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   } catch {}
 }
 
+/** 로그인 직후 서버 병합이 성공하면 localStorage 스냅샷을 비웁니다. */
 function clearLocal() {
   try {
     localStorage.removeItem(STORAGE_KEY);

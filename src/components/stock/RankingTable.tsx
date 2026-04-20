@@ -12,6 +12,7 @@
 
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
+import { MarketBadge } from '@/components/ui/badges';
 
 export type RankingTableRow = {
   code: string;
@@ -65,16 +66,7 @@ export default function RankingTable({
                   <span className="truncate text-sm font-medium text-foreground">
                     {row.name}
                   </span>
-                  <span
-                    className={cn(
-                      'shrink-0 rounded px-1.5 py-0.5 text-[10px] font-semibold',
-                      row.market === 'KOSPI'
-                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
-                        : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-                    )}
-                  >
-                    {row.market}
-                  </span>
+                  <MarketBadge market={row.market} />
                   <span className="shrink-0 text-[10px] text-muted-foreground">
                     {row.code}
                   </span>
