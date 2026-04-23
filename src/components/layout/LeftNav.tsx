@@ -22,12 +22,16 @@ import {
   Moon,
   Star,
   ChevronDown,
+  LogIn,
+  LogOut,
+  User,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/components/theme-provider';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { useSidebar } from '@/contexts/SidebarContext';
+import { useAuth } from '@/contexts/AuthContext';
 import { useScrollAtTop } from '@/hooks/useScrollAtTop';
 
 type NavItem =
@@ -68,6 +72,7 @@ export function LeftNav() {
   const { theme, setTheme } = useTheme();
   const { favorites, removeFavorite } = useFavorites();
   const { isOpen, close } = useSidebar();
+  const { user, nickname, loading, signInWithGoogle, signOut } = useAuth();
   const isAtTop = useScrollAtTop();
 
   return (
@@ -113,8 +118,57 @@ export function LeftNav() {
 
         {/* 스크롤 영역 */}
         <div className="flex-1 overflow-y-auto flex flex-col">
+          {/* 계정 섹션 */}
+          {!loading && (
+            <div className="p-2 pt-3">
+              {user ? (
+                <div className="flex items-center gap-2 px-2 py-2 rounded-lg bg-sidebar-accent/40">
+                  {user.user_metadata?.avatar_url ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={user.user_metadata.avatar_url}
+                      alt="프로필"
+                      className="h-9 w-9 rounded-full object-cover shrink-0"
+                    />
+                  ) : (
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-border text-sidebar-foreground">
+                      <User size={16} />
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-sidebar-foreground">
+                      {nickname ?? user.email ?? '사용자'}
+                    </p>
+                    <p className="truncate text-xs text-sidebar-foreground/60">
+                      로그인됨
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      signOut();
+                      close();
+                    }}
+                    className="shrink-0 h-8 w-8 flex items-center justify-center rounded-md text-sidebar-foreground/70 hover:bg-sidebar-border hover:text-sidebar-foreground transition-colors"
+                    aria-label="로그아웃"
+                    title="로그아웃"
+                  >
+                    <LogOut size={16} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => signInWithGoogle()}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-sm font-medium bg-sidebar-primary text-sidebar-primary-foreground hover:opacity-90 transition-opacity"
+                >
+                  <LogIn size={16} />
+                  로그인
+                </button>
+              )}
+            </div>
+          )}
+
           {/* 네비게이션 메뉴 */}
-          <nav className="p-2 pt-4">
+          <nav className="p-2 pt-2">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive =
