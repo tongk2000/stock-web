@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import QueryProvider from "@/components/layout/query-provider";
 import { LeftNav } from "@/components/layout/LeftNav";
 import AppHeader from "@/components/layout/AppHeader";
+import BottomBar from "@/components/layout/BottomBar";
 import { ThemeProvider } from "@/components/theme-provider";
 import { FavoritesProvider } from "@/contexts/FavoritesContext";
 import { SidebarProvider } from "@/contexts/SidebarContext";
@@ -50,8 +51,9 @@ export default function RootLayout({
       {/*
        * 전체 레이아웃 구조:
        *
+       * [데스크톱 sm+]
        *  ┌─────────────────────────────────────┐  ← AppHeader (h-14, sticky)
-       *  │  ☰  [검색창]              [테마토글]  │
+       *  │               [검색창]               │
        *  ├──────────┬──────────────────────────┤
        *  │          │                          │
        *  │  LeftNav │  {children}              │
@@ -59,10 +61,20 @@ export default function RootLayout({
        *  │  sidebar)│                          │
        *  └──────────┴──────────────────────────┘
        *
-       * - 모바일: AppHeader 햄버거 버튼 → SidebarContext.toggle() → LeftNav 슬라이드
-       * - 데스크탑: LeftNav 항상 노출, 햄버거 버튼 숨김
+       * [모바일]
+       *  ┌─────────────────────────────────────┐
+       *  │                                      │
+       *  │   {children}                         │
+       *  │                                      │
+       *  ├──────────────────────────────────────┤  ← BottomBar (fixed)
+       *  │         [검색창]        [☰]          │
+       *  └──────────────────────────────────────┘
+       *
+       * - 모바일: AppHeader 숨김, BottomBar 메뉴 버튼 → LeftNav 슬라이드
+       * - 데스크탑: LeftNav 항상 노출, BottomBar 숨김
+       * - 로그인/로그아웃은 LeftNav 상단에 위치
        */}
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col pb-16 sm:pb-0">
         <ThemeProvider defaultTheme="system" storageKey={STORAGE_KEYS.THEME}>
           <AuthProvider>
           <FavoritesProvider>
@@ -76,6 +88,7 @@ export default function RootLayout({
                   </div>
                 </QueryProvider>
               </div>
+              <BottomBar />
             </SidebarProvider>
           </FavoritesProvider>
           </AuthProvider>
