@@ -88,13 +88,14 @@ export function LeftNav() {
       {/* 사이드바 */}
       <aside
         className={cn(
-          'fixed top-0 left-0 h-full z-50 w-64 flex flex-col bg-sidebar border-r border-sidebar-border',
+          // 모바일: 오른쪽에서 슬라이드 인 / 데스크톱: 왼쪽 고정 사이드바
+          'fixed top-0 right-0 sm:right-auto sm:left-0 h-full z-50 w-64 flex flex-col bg-sidebar border-l border-sidebar-border sm:border-l-0 sm:border-r',
           // 데스크탑: sticky, 헤더 표시 시 top-14, 헤더 숨김 시 top-0
           isAtTop
             ? 'sm:sticky sm:top-14 sm:h-[calc(100vh-3.5rem)] sm:z-auto'
             : 'sm:sticky sm:top-0 sm:h-screen sm:z-auto',
           'transition-transform duration-300 ease-in-out',
-          isOpen ? 'translate-x-0' : '-translate-x-full sm:translate-x-0',
+          isOpen ? 'translate-x-0' : 'translate-x-full sm:translate-x-0',
         )}
       >
         {/* 모바일 사이드바 헤더 (로고 + 닫기 버튼) */}
