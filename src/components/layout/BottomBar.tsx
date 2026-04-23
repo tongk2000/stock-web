@@ -43,8 +43,8 @@ export default function BottomBar() {
     };
   }, []);
 
-  // 키보드가 떠 있거나 메뉴가 열려 있을 땐 항상 표시
-  const hidden = !isVisible && keyboardOffset === 0 && !isOpen;
+  // 드로어가 열려 있으면 숨김. 그 외엔 스크롤 방향을 따름 (키보드 중엔 강제 노출)
+  const hidden = isOpen || (!isVisible && keyboardOffset === 0);
 
   return (
     <div
