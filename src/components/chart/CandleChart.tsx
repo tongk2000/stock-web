@@ -347,15 +347,17 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       const tooltip = tooltipRef.current, container = containerRef.current;
       if (!tooltip || !container) return;
       if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
-        tooltip.style.display = 'none'; hoveredDateRef.current = null;
-        if (topInfoRef.current) topInfoRef.current.style.display = 'none';
+        tooltip.style.display = 'none';
+        // 툴팁 on 모드에서만 초기화 (툴팁 밖 터치로 메모가 뜨는 버그 방지)
+        // 툴팁 off 모드에서는 유지 → 인포바가 마지막 캔들 정보를 보여주고 메모 버튼도 동작
+        if (showTooltipRef.current) hoveredDateRef.current = null;
         return;
       }
       const candle = candleMap.get(param.time as string);
       const ohlc   = param.seriesData.get(candleSeries) as CandlestickData | undefined;
       if (!candle || !ohlc) {
-        tooltip.style.display = 'none'; hoveredDateRef.current = null;
-        if (topInfoRef.current) topInfoRef.current.style.display = 'none';
+        tooltip.style.display = 'none';
+        if (showTooltipRef.current) hoveredDateRef.current = null;
         return;
       }
 
