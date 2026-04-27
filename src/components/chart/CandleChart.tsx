@@ -328,11 +328,11 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       const tooltip = tooltipRef.current, container = containerRef.current;
       if (!tooltip || !container) return;
       if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
-        tooltip.style.display = 'none'; return;
+        tooltip.style.display = 'none'; hoveredDateRef.current = null; return;
       }
       const candle = candleMap.get(param.time as string);
       const ohlc   = param.seriesData.get(candleSeries) as CandlestickData | undefined;
-      if (!candle || !ohlc) { tooltip.style.display = 'none'; return; }
+      if (!candle || !ohlc) { tooltip.style.display = 'none'; hoveredDateRef.current = null; return; }
 
       // 크로스헤어가 정확히 가리키는 날짜를 기록 (클릭 시 이 값 사용)
       hoveredDateRef.current = candle.date;
