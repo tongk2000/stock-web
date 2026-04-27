@@ -38,7 +38,7 @@ import {
   LineData,
   Time,
 } from 'lightweight-charts';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, type RefObject } from 'react';
 import type { Candle } from '@/types/stock';
 import { calcMA, calcBB, calcRSI, calcOBV } from '@/lib/indicators';
 
@@ -57,6 +57,22 @@ interface Props {
   isDark: boolean;
   memos?: Map<string, string>;
   onDateClick?: (date: string) => void;
+  topInfoRef?: RefObject<HTMLDivElement>;
+}
+
+function buildDefaultInfoHtml(): string {
+  return (
+    `<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">시&nbsp;</span>0</span>` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">고&nbsp;</span>0</span>` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">저&nbsp;</span>0</span>` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">종&nbsp;</span>0</span>` +
+    `<span style="font-size:11px;opacity:0.45">0 (0.00%)</span>` +
+    `</div>` +
+    `<div style="display:flex;gap:6px;align-items:center;font-size:10px;opacity:0.35">` +
+    `<span>✎ 캔들을 선택하세요</span>` +
+    `</div>`
+  );
 }
 
 const MA_COLORS: Record<number, string> = {
@@ -106,7 +122,7 @@ function lineVal(seriesData: Map<ISeriesApi<'Line'>, unknown>, s: ISeriesApi<'Li
   return (seriesData.get(s) as LineData | undefined)?.value ?? null;
 }
 
-export default function CandleChart({ candles, indicators, isDark, memos, onDateClick }: Props) {
+export default function CandleChart({ candles, indicators, isDark, memos, onDateClick, topInfoRef }: Props) {
   const wrapperRef      = useRef<HTMLDivElement>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
   const tooltipRef      = useRef<HTMLDivElement>(null);
@@ -117,27 +133,32 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
   const onDateClickRef  = useRef<((date: string) => void) | undefined>(onDateClick);
   // 크로스헤어가 현재 가리키는 날짜 — 모바일에서 탭 좌표 오차 없이 정확한 날짜 전달
   const hoveredDateRef  = useRef<string | null>(null);
-  // 툴팁 off 시 상단에 표시하는 인포바
-  const topInfoRef      = useRef<HTMLDivElement>(null);
 
   // memos / onDateClick 변경 시 ref 동기화
   useEffect(() => { memosRef.current = memos ?? new Map(); }, [memos]);
   useEffect(() => { onDateClickRef.current = onDateClick; }, [onDateClick]);
 
-  // indicators.tooltip 변경 시 ref 동기화 + 즉시 숨김 처리
+  // indicators.tooltip 변경 시 ref 동기화 + 툴팁/인포바 즉시 처리
   useEffect(() => {
     showTooltipRef.current = indicators.tooltip;
     if (!indicators.tooltip && tooltipRef.current) {
       tooltipRef.current.style.display = 'none';
     }
-    if (indicators.tooltip && topInfoRef.current) {
-      topInfoRef.current.style.display = 'none';
+    const ti = topInfoRef?.current;
+    if (ti) {
+      if (indicators.tooltip) {
+        ti.style.display = 'none';
+      } else {
+        ti.innerHTML = buildDefaultInfoHtml();
+        ti.style.display = 'block';
+      }
     }
-  }, [indicators.tooltip]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicators.tooltip, topInfoRef]);
 
   // 상단 인포바 메모 버튼 클릭 처리
   useEffect(() => {
-    const el = topInfoRef.current;
+    const el = topInfoRef?.current;
     if (!el) return;
     const handleClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -147,7 +168,8 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
     };
     el.addEventListener('click', handleClick);
     return () => el.removeEventListener('click', handleClick);
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topInfoRef]);
 
   // 차트 인스턴스 + 시리즈 ref (effect 간 공유)
   const chartRef        = useRef<IChartApi | null>(null);
@@ -394,7 +416,7 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       // tooltip이 꺼져 있으면 상단 인포바로 대체
       if (!showTooltipRef.current) {
         tooltip.style.display = 'none';
-        const topInfo = topInfoRef.current;
+        const topInfo = topInfoRef?.current;
         if (topInfo) {
           // 1줄: 날짜 + OHLCV + 등락
           let infoHtml =
@@ -711,11 +733,6 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
         ref={tooltipRef}
         style={{ display: 'none' }}
         className="pointer-events-none absolute z-10 rounded-lg border border-border bg-card/30 px-2.5 py-2 text-foreground shadow-md backdrop-blur-sm"
-      />
-      <div
-        ref={topInfoRef}
-        style={{ display: 'none' }}
-        className="pointer-events-none absolute left-1 top-1 z-10 flex flex-col gap-0.5 rounded-lg border border-border bg-card/30 px-2 py-1.5 text-foreground shadow-sm backdrop-blur-sm"
       />
     </div>
   );

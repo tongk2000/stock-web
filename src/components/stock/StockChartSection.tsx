@@ -23,7 +23,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -158,6 +158,7 @@ export default function StockChartSection({ code }: Props) {
   const [memoInput, setMemoInput] = useState('');
 
   const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
+  const topInfoRef = useRef<HTMLDivElement>(null);
 
   // 로그인 유저 ID 확인
   useEffect(() => {
@@ -440,6 +441,13 @@ export default function StockChartSection({ code }: Props) {
           )}
         </div>
 
+        {/* 인포바 (툴팁 off 시 차트 위에 표시) */}
+        <div
+          ref={topInfoRef}
+          style={{ display: 'none' }}
+          className="flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-foreground"
+        />
+
         {/* 차트 */}
         {loading ? (
           <div className="h-[450px] md:h-[590px] w-full animate-pulse rounded-xl bg-muted" />
@@ -450,6 +458,7 @@ export default function StockChartSection({ code }: Props) {
             isDark={isDark}
             memos={memosMap}
             onDateClick={handleDateClick}
+            topInfoRef={topInfoRef}
           />
         ) : (
           <div className="flex h-[400px] items-center justify-center text-muted-foreground">
