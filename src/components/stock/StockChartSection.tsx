@@ -332,6 +332,13 @@ export default function StockChartSection({ code }: Props) {
         ) : null}
       </div>
 
+      {/* 인포바 (툴팁 off 시 차트 카드 밖, 위에 표시) */}
+      <div
+        ref={topInfoRef}
+        style={{ display: 'none' }}
+        className="mb-2 flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-foreground"
+      />
+
       {/* 차트 영역 */}
       <div className="rounded-xl border border-border bg-card/50 p-1 sm:p-4">
         {/* 컨트롤 바 */}
@@ -440,13 +447,6 @@ export default function StockChartSection({ code }: Props) {
             </div>
           )}
         </div>
-
-        {/* 인포바 (툴팁 off 시 차트 위에 표시) */}
-        <div
-          ref={topInfoRef}
-          style={{ display: 'none' }}
-          className="flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-foreground"
-        />
 
         {/* 차트 */}
         {loading ? (
