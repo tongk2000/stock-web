@@ -57,7 +57,7 @@ interface Props {
   isDark: boolean;
   memos?: Map<string, string>;
   onDateClick?: (date: string) => void;
-  topInfoRef?: RefObject<HTMLDivElement>;
+  topInfoRef?: RefObject<HTMLDivElement | null>;
 }
 
 function buildDefaultInfoHtml(): string {
