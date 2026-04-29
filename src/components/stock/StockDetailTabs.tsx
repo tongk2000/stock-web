@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import DiscussionSection from '@/components/discussion/DiscussionSection';
+import CompanyInfoSection from '@/components/stock/CompanyInfoSection';
 
 type TabId = 'info' | 'quote' | 'discussion' | 'news' | 'disclosure' | 'flow';
 
@@ -46,7 +47,9 @@ export default function StockDetailTabs({ stockCode, roomId }: Props) {
       </div>
 
       <div className="mt-4">
-        {active === 'discussion' ? (
+        {active === 'info' ? (
+          <CompanyInfoSection stockCode={stockCode} />
+        ) : active === 'discussion' ? (
           roomId ? (
             <DiscussionSection roomId={roomId} stockCode={stockCode} />
           ) : (
