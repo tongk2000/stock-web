@@ -76,85 +76,113 @@ export default function CompanyInfoSection({ stockCode }: { stockCode: string })
     const supabase = createClient();
 
     async function load() {
-      const [stockRes, dailyRes, financialsRes, extremesRes, candlesRes] = await Promise.all([
-        supabase
-          .from('stocks')
-          .select(
-            'description, face_value, substitute_value, listing_date, ipo_price, shares_outstanding, capital, foreign_ownership_ratio',
-          )
-          .eq('code', stockCode)
-          .single(),
-        supabase
-          .from('v_daily_change')
-          .select('today_close, prev_close')
-          .eq('stock_code', stockCode)
-          .single(),
-        supabase
-          .from('v_latest_financials')
-          .select(
-            'year, quarter, net_income, market_cap, per, eps, pbr, bps, ev_ebitda, roe, dividend, dividend_yield, credit_balance_ratio',
-          )
-          .eq('stock_code', stockCode)
-          .single(),
-        supabase
-          .from('v_52w_extremes')
-          .select('high_252, low_252')
-          .eq('stock_code', stockCode)
-          .single(),
-        supabase
-          .from('candles')
-          .select('date, high, low')
-          .eq('stock_code', stockCode)
-          .eq('exchange', 'KRX')
-          .eq('candle_type', 'daily')
-          .order('date', { ascending: false })
-          .limit(20),
-      ]);
+      try {
+        // 기존 컬럼(항상 존재)과 신규 컬럼(migration 미적용 시 실패 가능)을 분리해서
+        // 신규 쪽이 실패해도 기존 데이터가 정상 표시되도록 합니다.
+        const [
+          stockBaseRes,
+          stockExtRes,
+          dailyRes,
+          financialsBaseRes,
+          financialsExtRes,
+          extremesRes,
+          candlesRes,
+        ] = await Promise.all([
+          // stocks — 기존 컬럼 (20260419000002에서 추가)
+          supabase
+            .from('stocks')
+            .select('shares_outstanding')
+            .eq('code', stockCode)
+            .single(),
+          // stocks — 신규 컬럼 (20260429000001에서 추가, migration 전에는 null 반환)
+          supabase
+            .from('stocks')
+            .select('description, face_value, substitute_value, listing_date, ipo_price, capital, foreign_ownership_ratio')
+            .eq('code', stockCode)
+            .single(),
+          // v_daily_change — 컬럼 변경 없음
+          supabase
+            .from('v_daily_change')
+            .select('today_close, prev_close')
+            .eq('stock_code', stockCode)
+            .single(),
+          // v_latest_financials — 기존 컬럼
+          supabase
+            .from('v_latest_financials')
+            .select('year, quarter, net_income, market_cap, per, eps, pbr, roe')
+            .eq('stock_code', stockCode)
+            .single(),
+          // v_latest_financials — 신규 컬럼 (migration 전에는 null 반환)
+          supabase
+            .from('v_latest_financials')
+            .select('bps, ev_ebitda, dividend, dividend_yield, credit_balance_ratio')
+            .eq('stock_code', stockCode)
+            .single(),
+          // v_52w_extremes — 컬럼 변경 없음
+          supabase
+            .from('v_52w_extremes')
+            .select('high_252, low_252')
+            .eq('stock_code', stockCode)
+            .single(),
+          // candles — 5일/20일 계산용
+          supabase
+            .from('candles')
+            .select('high, low')
+            .eq('stock_code', stockCode)
+            .eq('exchange', 'KRX')
+            .eq('candle_type', 'daily')
+            .order('date', { ascending: false })
+            .limit(20),
+        ]);
 
-      type CandleRow = { high: number; low: number };
-      const candles: CandleRow[] = candlesRes.data ?? [];
-      const high_5d = candles.slice(0, 5).reduce<number | null>((acc, c) => (acc == null ? c.high : Math.max(acc, c.high)), null);
-      const low_5d = candles.slice(0, 5).reduce<number | null>((acc, c) => (acc == null ? c.low : Math.min(acc, c.low)), null);
-      const high_20d = candles.reduce<number | null>((acc, c) => (acc == null ? c.high : Math.max(acc, c.high)), null);
-      const low_20d = candles.reduce<number | null>((acc, c) => (acc == null ? c.low : Math.min(acc, c.low)), null);
+        type CandleRow = { high: number; low: number };
+        const candles: CandleRow[] = candlesRes.data ?? [];
+        const high_5d = candles.slice(0, 5).reduce<number | null>((acc, c) => (acc == null ? c.high : Math.max(acc, c.high)), null);
+        const low_5d = candles.slice(0, 5).reduce<number | null>((acc, c) => (acc == null ? c.low : Math.min(acc, c.low)), null);
+        const high_20d = candles.reduce<number | null>((acc, c) => (acc == null ? c.high : Math.max(acc, c.high)), null);
+        const low_20d = candles.reduce<number | null>((acc, c) => (acc == null ? c.low : Math.min(acc, c.low)), null);
 
-      const s = stockRes.data;
-      const d = dailyRes.data;
-      const f = financialsRes.data;
-      const e = extremesRes.data;
+        const sb = stockBaseRes.data;
+        const se = stockExtRes.data;
+        const d = dailyRes.data;
+        const fb = financialsBaseRes.data;
+        const fe = financialsExtRes.data;
+        const e = extremesRes.data;
 
-      setData({
-        description: s?.description ?? null,
-        face_value: s?.face_value ?? null,
-        substitute_value: s?.substitute_value ?? null,
-        listing_date: s?.listing_date ?? null,
-        ipo_price: s?.ipo_price ?? null,
-        shares_outstanding: s?.shares_outstanding ?? null,
-        capital: s?.capital ?? null,
-        foreign_ownership_ratio: s?.foreign_ownership_ratio ?? null,
-        today_close: d?.today_close ?? null,
-        prev_close: d?.prev_close ?? null,
-        year: f?.year ?? null,
-        quarter: f?.quarter ?? null,
-        net_income: f?.net_income ?? null,
-        market_cap: f?.market_cap ?? null,
-        per: f?.per ?? null,
-        eps: f?.eps ?? null,
-        pbr: f?.pbr ?? null,
-        bps: f?.bps ?? null,
-        ev_ebitda: f?.ev_ebitda ?? null,
-        roe: f?.roe ?? null,
-        dividend: f?.dividend ?? null,
-        dividend_yield: f?.dividend_yield ?? null,
-        credit_balance_ratio: f?.credit_balance_ratio ?? null,
-        high_5d,
-        low_5d,
-        high_20d,
-        low_20d,
-        high_52w: e?.high_252 ?? null,
-        low_52w: e?.low_252 ?? null,
-      });
-      setLoading(false);
+        setData({
+          description: se?.description ?? null,
+          face_value: se?.face_value ?? null,
+          substitute_value: se?.substitute_value ?? null,
+          listing_date: se?.listing_date ?? null,
+          ipo_price: se?.ipo_price ?? null,
+          shares_outstanding: sb?.shares_outstanding ?? null,
+          capital: se?.capital ?? null,
+          foreign_ownership_ratio: se?.foreign_ownership_ratio ?? null,
+          today_close: d?.today_close ?? null,
+          prev_close: d?.prev_close ?? null,
+          year: fb?.year ?? null,
+          quarter: fb?.quarter ?? null,
+          net_income: fb?.net_income ?? null,
+          market_cap: fb?.market_cap ?? null,
+          per: fb?.per ?? null,
+          eps: fb?.eps ?? null,
+          pbr: fb?.pbr ?? null,
+          roe: fb?.roe ?? null,
+          bps: fe?.bps ?? null,
+          ev_ebitda: fe?.ev_ebitda ?? null,
+          dividend: fe?.dividend ?? null,
+          dividend_yield: fe?.dividend_yield ?? null,
+          credit_balance_ratio: fe?.credit_balance_ratio ?? null,
+          high_5d,
+          low_5d,
+          high_20d,
+          low_20d,
+          high_52w: e?.high_252 ?? null,
+          low_52w: e?.low_252 ?? null,
+        });
+      } finally {
+        setLoading(false);
+      }
     }
 
     load();
