@@ -42,6 +42,11 @@ export type LatestFinancialsRow = {
   roe: number | null;
   debt_ratio: number | null;
   market_cap: number | null;
+  bps: number | null;
+  ev_ebitda: number | null;
+  dividend: number | null;
+  dividend_yield: number | null;
+  credit_balance_ratio: number | null;
 };
 
 /** view: v_52w_extremes */
