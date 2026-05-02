@@ -17,6 +17,15 @@ export function isMarketOpen(): boolean {
   return mins >= 9 * 60 && mins < 15 * 60 + 30;
 }
 
+// 배치 수집(16:00 KST) 전까지 폴링 — 종가 확정 후에도 DB 반영 전이면 계속 갱신
+function isBeforeBatchCollection(): boolean {
+  const kst = kstNow();
+  const day = kst.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const mins = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+  return mins >= 9 * 60 && mins < 16 * 60 + 10;
+}
+
 // isTradingDay: 서버에서 판별 후 내려온 값. false면 fetch 자체를 하지 않음
 export function useTodayCandle(code: string, isTradingDay: boolean): Candle | null {
   const [candle, setCandle] = useState<Candle | null>(null);
@@ -42,7 +51,7 @@ export function useTodayCandle(code: string, isTradingDay: boolean): Candle | nu
     fetch_();
 
     timerRef.current = setInterval(() => {
-      if (isMarketOpen()) fetch_();
+      if (isBeforeBatchCollection()) fetch_();
     }, POLL_MS);
 
     return () => {
