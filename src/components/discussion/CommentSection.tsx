@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Trash2 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { firstOrNull } from '@/lib/supabase/normalize';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { formatRelativeTime } from '@/lib/format';
@@ -40,11 +41,6 @@ const SELECT_COLS =
   'id, post_id, parent_id, user_id, reply_to_user_id, content, created_at, ' +
   'profiles!comments_user_id_fkey(nickname, is_premium), ' +
   'reply_to:profiles!comments_reply_to_user_id_fkey(nickname)';
-
-function firstOrNull<T>(v: T[] | T | null | undefined): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? (v[0] ?? null) : v;
-}
 
 function normalize(row: CommentRow): Comment {
   const p = firstOrNull(row.profiles);

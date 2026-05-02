@@ -9,11 +9,9 @@
 
 import type { MetadataRoute } from 'next';
 import { createClient } from '@/lib/supabase/server';
-import { ENGAGEMENT_THRESHOLD } from '@/lib/constants';
+import { ENGAGEMENT_THRESHOLD, LIMITS } from '@/lib/constants';
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000';
-/** sitemap.xml이 너무 커지지 않도록 최근 글부터 상한까지만 포함 */
-const MAX_POSTS = 10000;
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const supabase = await createClient();
@@ -27,7 +25,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         `like_count.gte.${ENGAGEMENT_THRESHOLD},comment_count.gte.${ENGAGEMENT_THRESHOLD}`,
       )
       .order('created_at', { ascending: false })
-      .limit(MAX_POSTS),
+      .limit(LIMITS.SITEMAP_MAX_POSTS),
   ]);
 
   const now = new Date();

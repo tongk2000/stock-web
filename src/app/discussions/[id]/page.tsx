@@ -12,6 +12,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import { firstOrNull } from '@/lib/supabase/normalize';
 import CommentSection from '@/components/discussion/CommentSection';
 import PostLikeButtons from '@/components/discussion/PostLikeButtons';
 import { formatRelativeTime } from '@/lib/format';
@@ -35,11 +36,6 @@ type PostRow = {
     | { nickname: string; is_premium: boolean }[]
     | null;
 };
-
-function firstOrNull<T>(v: T | T[] | null | undefined): T | null {
-  if (!v) return null;
-  return Array.isArray(v) ? (v[0] ?? null) : v;
-}
 
 async function fetchPostWithStock(id: string) {
   const supabase = await createClient();

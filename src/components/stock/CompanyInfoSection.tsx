@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
+import { LIMITS } from '@/lib/constants';
 
 interface CompanyInfoData {
   // stocks
@@ -124,7 +125,7 @@ export default function CompanyInfoSection({ stockCode }: { stockCode: string })
             .select('high_252, low_252')
             .eq('stock_code', stockCode)
             .single(),
-          // candles — 5일/20일 계산용
+          // candles — 5일/20일 고저가 계산용 (lookback = LIMITS.COMPANY_INFO_LOOKBACK_DAYS)
           supabase
             .from('candles')
             .select('high, low')
@@ -132,7 +133,7 @@ export default function CompanyInfoSection({ stockCode }: { stockCode: string })
             .eq('exchange', 'KRX')
             .eq('candle_type', 'daily')
             .order('date', { ascending: false })
-            .limit(20),
+            .limit(LIMITS.COMPANY_INFO_LOOKBACK_DAYS),
         ]);
 
         type CandleRow = { high: number; low: number };
