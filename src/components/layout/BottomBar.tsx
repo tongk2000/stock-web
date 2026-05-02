@@ -30,9 +30,11 @@ export default function BottomBar() {
     const vv = typeof window !== 'undefined' ? window.visualViewport : null;
     if (!vv) return;
     const update = () => {
-      // layout viewport 하단과 visual viewport 하단의 차이 = 키보드 높이
       const offset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setKeyboardOffset(offset);
+      // 키보드(200px+)와 URL 바 애니메이션(50-70px)을 구분.
+      // URL 바가 올라오는 순간 두 값의 업데이트 타이밍 차이로 offset이 URL 바 높이만큼
+      // 잘못 계산되어 하단바가 위로 밀리는 현상을 방지한다.
+      setKeyboardOffset(offset >= 100 ? offset : 0);
     };
     update();
     vv.addEventListener('resize', update);
