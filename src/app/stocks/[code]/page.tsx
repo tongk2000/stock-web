@@ -16,6 +16,7 @@ import { createClient } from '@/lib/supabase/server';
 import StockChartSection from '@/components/stock/StockChartSection';
 import { FavoriteButton } from '@/components/stock/FavoriteButton';
 import StockDetailTabs from '@/components/stock/StockDetailTabs';
+import { getIsTradingDay } from '@/lib/market';
 
 interface Props {
   params: Promise<{ code: string }>;
@@ -39,7 +40,7 @@ export default async function StockPage({ params }: Props) {
   const { code } = await params;
   const supabase = await createClient();
 
-  const [{ data: stock }, { data: room }] = await Promise.all([
+  const [{ data: stock }, { data: room }, isTradingDay] = await Promise.all([
     supabase.from('stocks').select('code, name, market').eq('code', code).single(),
     supabase
       .from('discussion_rooms')
@@ -47,6 +48,7 @@ export default async function StockPage({ params }: Props) {
       .eq('stock_code', code)
       .eq('is_official', true)
       .single(),
+    getIsTradingDay(),
   ]);
 
   if (!stock) {
@@ -71,7 +73,7 @@ export default async function StockPage({ params }: Props) {
           <FavoriteButton code={stock.code} name={stock.name} />
         </div>
 
-        <StockChartSection code={code} />
+        <StockChartSection code={code} isTradingDay={isTradingDay} />
 
         <StockDetailTabs stockCode={code} roomId={room?.id ?? null} />
       </div>

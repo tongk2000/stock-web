@@ -80,6 +80,7 @@ function loadIndicators(): IndicatorOptions {
 
 interface Props {
   code: string;
+  isTradingDay: boolean;
 }
 
 /** KRX·NXT 일봉을 날짜 기준으로 합산 (고가=max, 저가=min, 거래량=합계, 종가=KRX 기준) */
@@ -137,13 +138,13 @@ function ToggleBtn({
   );
 }
 
-export default function StockChartSection({ code }: Props) {
+export default function StockChartSection({ code, isTradingDay }: Props) {
   const { signInWithGoogle } = useAuth();
   const isDark = useIsDark();
   const [exchange, setExchange] = useState<ExchangeType>('통합');
   const [candleType, setCandleType] = useState<CandleType>('daily');
   const [allCandles, setAllCandles] = useState<Candle[]>([]);
-  const todayCandle = useTodayCandle(code);
+  const todayCandle = useTodayCandle(code, isTradingDay);
 
   const allCandlesWithToday = useMemo(() => {
     if (!todayCandle) return allCandles;

@@ -9,24 +9,21 @@ function kstNow() {
   return new Date(Date.now() + 9 * 60 * 60 * 1000);
 }
 
-function isTradingDay(): boolean {
-  const day = kstNow().getUTCDay(); // 0=Sun, 6=Sat
-  return day !== 0 && day !== 6;
-}
-
 export function isMarketOpen(): boolean {
-  if (!isTradingDay()) return false;
   const kst = kstNow();
+  const day = kst.getUTCDay();
+  if (day === 0 || day === 6) return false;
   const mins = kst.getUTCHours() * 60 + kst.getUTCMinutes();
   return mins >= 9 * 60 && mins < 15 * 60 + 30;
 }
 
-export function useTodayCandle(code: string): Candle | null {
+// isTradingDay: 서버에서 판별 후 내려온 값. false면 fetch 자체를 하지 않음
+export function useTodayCandle(code: string, isTradingDay: boolean): Candle | null {
   const [candle, setCandle] = useState<Candle | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!isTradingDay()) return;
+    if (!isTradingDay) return;
 
     const todayStr = kstNow().toISOString().slice(0, 10);
 
@@ -35,7 +32,6 @@ export function useTodayCandle(code: string): Candle | null {
         const res = await fetch(`/api/stock/today/${code}`);
         if (!res.ok) return;
         const data = await res.json();
-        // 응답 날짜가 오늘이 아니면 공휴일 — live 데이터로 취급하지 않음
         if (data.date !== todayStr) return;
         setCandle(data);
       } catch {
@@ -52,7 +48,7 @@ export function useTodayCandle(code: string): Candle | null {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [code]);
+  }, [code, isTradingDay]);
 
   return candle;
 }
