@@ -17,13 +17,12 @@ export function isMarketOpen(): boolean {
   return mins >= 9 * 60 && mins < 15 * 60 + 30;
 }
 
-// 배치 수집(16:00 KST) 전까지 폴링 — 종가 확정 후에도 DB 반영 전이면 계속 갱신
 function isBeforeBatchCollection(): boolean {
   const kst = kstNow();
   const day = kst.getUTCDay();
   if (day === 0 || day === 6) return false;
   const mins = kst.getUTCHours() * 60 + kst.getUTCMinutes();
-  return mins >= 9 * 60 && mins < 16 * 60 + 10;
+  return mins >= 9 * 60 && mins < 16 * 60 + 20;
 }
 
 // isTradingDay: 서버에서 판별 후 내려온 값. false면 fetch 자체를 하지 않음
@@ -36,6 +35,13 @@ export function useTodayCandle(code: string, isTradingDay: boolean): Candle | nu
 
     const todayStr = kstNow().toISOString().slice(0, 10);
 
+    function stopPolling() {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+        timerRef.current = null;
+      }
+    }
+
     async function fetch_() {
       try {
         const res = await fetch(`/api/stock/today/${code}`);
@@ -43,20 +49,27 @@ export function useTodayCandle(code: string, isTradingDay: boolean): Candle | nu
         const data = await res.json();
         if (data.date !== todayStr) return;
         setCandle(data);
+        // 장 종료 확인 → 더 이상 가격이 안 바뀌므로 폴링 중단
+        if (!isMarketOpen()) stopPolling();
       } catch {
         // network error — keep previous value
       }
     }
 
-    fetch_();
+    // 초기 fetch 후 장이 열려있을 때만 폴링 시작
+    fetch_().then(() => {
+      if (isMarketOpen()) {
+        timerRef.current = setInterval(() => {
+          if (isBeforeBatchCollection()) {
+            fetch_();
+          } else {
+            stopPolling();
+          }
+        }, POLL_MS);
+      }
+    });
 
-    timerRef.current = setInterval(() => {
-      if (isBeforeBatchCollection()) fetch_();
-    }, POLL_MS);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
+    return () => stopPolling();
   }, [code, isTradingDay]);
 
   return candle;
