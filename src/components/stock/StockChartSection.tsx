@@ -23,7 +23,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import { useEffect, useState, useMemo, useCallback, useRef } from 'react';
 import { ChevronDown, ChevronUp, SlidersHorizontal, X } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -31,6 +31,7 @@ import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
 import { aggregateCandles } from '@/lib/indicators';
 import { STORAGE_KEYS, MA_PERIODS } from '@/lib/constants';
+import { useTodayCandle, isMarketOpen } from '@/hooks/useTodayCandle';
 import type { Candle, CandleType } from '@/types/stock';
 import type { IndicatorOptions } from '@/components/chart/CandleChart';
 
@@ -142,8 +143,16 @@ export default function StockChartSection({ code }: Props) {
   const [exchange, setExchange] = useState<ExchangeType>('통합');
   const [candleType, setCandleType] = useState<CandleType>('daily');
   const [allCandles, setAllCandles] = useState<Candle[]>([]);
+  const todayCandle = useTodayCandle(code);
 
-  const candles = useMemo(() => aggregateCandles(allCandles, candleType), [allCandles, candleType]);
+  const allCandlesWithToday = useMemo(() => {
+    if (!todayCandle) return allCandles;
+    const last = allCandles[allCandles.length - 1];
+    if (last?.date === todayCandle.date) return allCandles; // 이미 DB에 있음
+    return [...allCandles, todayCandle];
+  }, [allCandles, todayCandle]);
+
+  const candles = useMemo(() => aggregateCandles(allCandlesWithToday, candleType), [allCandlesWithToday, candleType]);
 
   const [loading, setLoading] = useState(true);
   const [indicators, setIndicators] = useState<IndicatorOptions>(DEFAULT_INDICATORS);
@@ -158,6 +167,7 @@ export default function StockChartSection({ code }: Props) {
   const [memoInput, setMemoInput] = useState('');
 
   const memosMap = useMemo(() => new Map(Object.entries(memoRecord)), [memoRecord]);
+  const topInfoRef = useRef<HTMLDivElement>(null);
 
   // 로그인 유저 ID 확인
   useEffect(() => {
@@ -302,6 +312,7 @@ export default function StockChartSection({ code }: Props) {
   const change = latest && prev ? latest.close - prev.close : null;
   const changeRate = change !== null && prev ? (change / prev.close) * 100 : null;
   const isPositive = change !== null && change >= 0;
+  const isLiveCandle = todayCandle !== null && latest?.date === todayCandle.date;
 
   return (
     <div>
@@ -326,10 +337,27 @@ export default function StockChartSection({ code }: Props) {
                 </span>
               )}
             </div>
-            <p className="mt-1 text-xs text-muted-foreground">{latest.date} 기준</p>
+            <div className="mt-1 flex items-center gap-2">
+              <p className="text-xs text-muted-foreground">{latest.date} 기준</p>
+              {isLiveCandle && (
+                <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                  {isMarketOpen() && (
+                    <span className="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-green-500" />
+                  )}
+                  15분 지연
+                </span>
+              )}
+            </div>
           </>
         ) : null}
       </div>
+
+      {/* 인포바 (툴팁 off 시 차트 카드 밖, 위에 표시) */}
+      <div
+        ref={topInfoRef}
+        style={{ display: 'none' }}
+        className="mb-2 flex flex-col gap-0.5 rounded-lg border border-border bg-muted/40 px-2.5 py-1.5 text-foreground"
+      />
 
       {/* 차트 영역 */}
       <div className="rounded-xl border border-border bg-card/50 p-1 sm:p-4">
@@ -450,6 +478,7 @@ export default function StockChartSection({ code }: Props) {
             isDark={isDark}
             memos={memosMap}
             onDateClick={handleDateClick}
+            topInfoRef={topInfoRef}
           />
         ) : (
           <div className="flex h-[400px] items-center justify-center text-muted-foreground">

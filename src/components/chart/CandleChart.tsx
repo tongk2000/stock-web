@@ -38,7 +38,7 @@ import {
   LineData,
   Time,
 } from 'lightweight-charts';
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, type RefObject } from 'react';
 import type { Candle } from '@/types/stock';
 import { calcMA, calcBB, calcRSI, calcOBV } from '@/lib/indicators';
 
@@ -57,6 +57,22 @@ interface Props {
   isDark: boolean;
   memos?: Map<string, string>;
   onDateClick?: (date: string) => void;
+  topInfoRef?: RefObject<HTMLDivElement | null>;
+}
+
+function buildDefaultInfoHtml(): string {
+  return (
+    `<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">시&nbsp;</span>0</span>` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">고&nbsp;</span>0</span>` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">저&nbsp;</span>0</span>` +
+    `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">종&nbsp;</span>0</span>` +
+    `<span style="font-size:11px;opacity:0.45">0 (0.00%)</span>` +
+    `</div>` +
+    `<div style="display:flex;gap:6px;align-items:center;font-size:10px;opacity:0.35">` +
+    `<span>✎ 캔들을 선택하세요</span>` +
+    `</div>`
+  );
 }
 
 const MA_COLORS: Record<number, string> = {
@@ -106,7 +122,7 @@ function lineVal(seriesData: Map<ISeriesApi<'Line'>, unknown>, s: ISeriesApi<'Li
   return (seriesData.get(s) as LineData | undefined)?.value ?? null;
 }
 
-export default function CandleChart({ candles, indicators, isDark, memos, onDateClick }: Props) {
+export default function CandleChart({ candles, indicators, isDark, memos, onDateClick, topInfoRef }: Props) {
   const wrapperRef      = useRef<HTMLDivElement>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
   const tooltipRef      = useRef<HTMLDivElement>(null);
@@ -122,13 +138,38 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
   useEffect(() => { memosRef.current = memos ?? new Map(); }, [memos]);
   useEffect(() => { onDateClickRef.current = onDateClick; }, [onDateClick]);
 
-  // indicators.tooltip 변경 시 ref 동기화 + 즉시 숨김 처리
+  // indicators.tooltip 변경 시 ref 동기화 + 툴팁/인포바 즉시 처리
   useEffect(() => {
     showTooltipRef.current = indicators.tooltip;
     if (!indicators.tooltip && tooltipRef.current) {
       tooltipRef.current.style.display = 'none';
     }
-  }, [indicators.tooltip]);
+    const ti = topInfoRef?.current;
+    if (ti) {
+      if (indicators.tooltip) {
+        ti.style.display = 'none';
+      } else {
+        ti.innerHTML = buildDefaultInfoHtml();
+        ti.style.display = 'block';
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [indicators.tooltip, topInfoRef]);
+
+  // 상단 인포바 메모 버튼 클릭 처리
+  useEffect(() => {
+    const el = topInfoRef?.current;
+    if (!el) return;
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.dataset.memoBtn && hoveredDateRef.current && onDateClickRef.current) {
+        onDateClickRef.current(hoveredDateRef.current);
+      }
+    };
+    el.addEventListener('click', handleClick);
+    return () => el.removeEventListener('click', handleClick);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [topInfoRef]);
 
   // 차트 인스턴스 + 시리즈 ref (effect 간 공유)
   const chartRef        = useRef<IChartApi | null>(null);
@@ -328,11 +369,19 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       const tooltip = tooltipRef.current, container = containerRef.current;
       if (!tooltip || !container) return;
       if (!param.point || !param.time || param.point.x < 0 || param.point.y < 0) {
-        tooltip.style.display = 'none'; return;
+        tooltip.style.display = 'none';
+        // 툴팁 on 모드에서만 초기화 (툴팁 밖 터치로 메모가 뜨는 버그 방지)
+        // 툴팁 off 모드에서는 유지 → 인포바가 마지막 캔들 정보를 보여주고 메모 버튼도 동작
+        if (showTooltipRef.current) hoveredDateRef.current = null;
+        return;
       }
       const candle = candleMap.get(param.time as string);
       const ohlc   = param.seriesData.get(candleSeries) as CandlestickData | undefined;
-      if (!candle || !ohlc) { tooltip.style.display = 'none'; return; }
+      if (!candle || !ohlc) {
+        tooltip.style.display = 'none';
+        if (showTooltipRef.current) hoveredDateRef.current = null;
+        return;
+      }
 
       // 크로스헤어가 정확히 가리키는 날짜를 기록 (클릭 시 이 값 사용)
       hoveredDateRef.current = candle.date;
@@ -359,13 +408,69 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
         if (v !== null) legendsRef.current.obv.textContent = `OBV ${fmtObv(v)}`;
       }
 
-      // tooltip이 꺼져 있으면 여기서 종료
-      if (!showTooltipRef.current) { tooltip.style.display = 'none'; return; }
-
       const isUp = candle.close >= candle.open;
       const up = '#ef4444', dn = '#3b82f6', cl = isUp ? up : dn;
       const chg = candle.close - candle.open;
       const pct = ((chg / candle.open) * 100).toFixed(2);
+
+      // tooltip이 꺼져 있으면 상단 인포바로 대체
+      if (!showTooltipRef.current) {
+        tooltip.style.display = 'none';
+        const topInfo = topInfoRef?.current;
+        if (topInfo) {
+          // 1줄: 날짜 + OHLCV + 등락
+          let infoHtml =
+            `<div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap">` +
+            `<span style="opacity:0.45;font-size:10px">${candle.date}</span>` +
+            `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">시&nbsp;</span>${fmt(candle.open)}</span>` +
+            `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">고&nbsp;</span><span style="color:${up}">${fmt(candle.high)}</span></span>` +
+            `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">저&nbsp;</span><span style="color:${dn}">${fmt(candle.low)}</span></span>` +
+            `<span style="font-size:11px"><span style="opacity:0.45;font-size:10px">종&nbsp;</span><span style="color:${cl};font-weight:600">${fmt(candle.close)}</span></span>` +
+            `<span style="font-size:11px;color:${cl}">${isUp ? '+' : ''}${fmt(chg)}&nbsp;(${isUp ? '+' : ''}${pct}%)</span>` +
+            `</div>`;
+
+          // 2줄: MA
+          const maItems: string[] = [];
+          for (const { period, s } of [...overlayRef.current.ma].sort((a, b) => a.period - b.period)) {
+            const v = lineVal(sd, s);
+            if (v !== null) maItems.push(`<span><span style="color:${MA_SOLID[period]};font-size:10px">MA${period}&nbsp;</span>${fmt(Math.round(v))}</span>`);
+          }
+          if (maItems.length > 0) {
+            infoHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">${maItems.join('')}</div>`;
+          }
+
+          // 3줄: BB
+          const { bbUpper, bbMid, bbLower } = overlayRef.current;
+          const bbItems: string[] = [];
+          if (bbUpper) { const v = lineVal(sd, bbUpper); if (v !== null) bbItems.push(`<span><span style="color:#818cf8;font-size:10px">BB상&nbsp;</span>${fmt(Math.round(v))}</span>`); }
+          if (bbMid)   { const v = lineVal(sd, bbMid);   if (v !== null) bbItems.push(`<span><span style="color:#6366f1;font-size:10px">BB중&nbsp;</span>${fmt(Math.round(v))}</span>`); }
+          if (bbLower) { const v = lineVal(sd, bbLower);  if (v !== null) bbItems.push(`<span><span style="color:#818cf8;font-size:10px">BB하&nbsp;</span>${fmt(Math.round(v))}</span>`); }
+          if (bbItems.length > 0) {
+            infoHtml += `<div style="display:flex;gap:8px;flex-wrap:wrap;font-size:11px">${bbItems.join('')}</div>`;
+          }
+
+          // 4줄: 메모 + 추가/수정 버튼
+          const memo = memosRef.current.get(candle.date);
+          if (memo) {
+            const preview = memo.length > 50 ? memo.slice(0, 50) + '…' : memo;
+            infoHtml +=
+              `<div style="display:flex;gap:6px;align-items:center;font-size:10px">` +
+              `<span style="color:#a78bfa">✎&nbsp;${preview}</span>` +
+              `<button data-memo-btn="1" style="font-size:10px;color:#a78bfa;border:1px solid rgba(167,139,250,0.4);border-radius:4px;padding:0 5px;background:transparent;cursor:pointer;pointer-events:auto;line-height:1.6">수정</button>` +
+              `</div>`;
+          } else {
+            infoHtml +=
+              `<div style="display:flex;gap:6px;align-items:center;font-size:10px">` +
+              `<span style="opacity:0.35">✎ 메모</span>` +
+              `<button data-memo-btn="1" style="font-size:10px;opacity:0.5;border:1px solid rgba(128,128,128,0.35);border-radius:4px;padding:0 5px;background:transparent;cursor:pointer;pointer-events:auto;line-height:1.6">추가</button>` +
+              `</div>`;
+          }
+
+          topInfo.innerHTML = infoHtml;
+          topInfo.style.display = 'block';
+        }
+        return;
+      }
 
       // ── OHLCV (툴팁) ─────────────────────────────────────────────────────────
       let html = `
