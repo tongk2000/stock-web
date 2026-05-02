@@ -11,27 +11,18 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
-import { ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
-import { formatRelativeTime } from '@/lib/format';
 import { PAGE_SIZE } from '@/lib/constants';
-
-type Post = {
-  id: string;
-  content: string;
-  created_at: string;
-  like_count: number;
-  stock_code: string;
-  user_id: string;
-};
-
-type ProfileInfo = { nickname: string; is_premium: boolean };
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
+import PostCard, {
+  type PostCardData,
+  type PostCardProfile,
+} from './PostCard';
 
 export default function DiscussionFeed({ query = '' }: { query?: string }) {
-  const [posts, setPosts] = useState<Post[]>([]);
+  const [posts, setPosts] = useState<PostCardData[]>([]);
   const [stockMap, setStockMap] = useState<Map<string, string>>(new Map());
-  const [profileMap, setProfileMap] = useState<Map<string, ProfileInfo>>(new Map());
+  const [profileMap, setProfileMap] = useState<Map<string, PostCardProfile>>(new Map());
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -48,12 +39,13 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
         .limit(PAGE_SIZE.DEFAULT);
       if (cursor) q = q.lt('created_at', cursor);
       if (query) {
+        // % _ \ 는 ILIKE 메타문자라 사용자 입력에 그대로 두면 안 됨
         const escaped = query.replace(/([\\%_])/g, '\\$1');
         q = q.ilike('content', `%${escaped}%`);
       }
 
       const { data: postsData } = await q;
-      const list = (postsData ?? []) as Post[];
+      const list = (postsData ?? []) as PostCardData[];
       const stockCodes = [...new Set(list.map((p) => p.stock_code))];
       const userIds = [...new Set(list.map((p) => p.user_id))];
 
@@ -104,6 +96,7 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
     setLoadingMore(true);
     const { list, stocks, profiles } = await fetchPage(lastPost.created_at);
     setPosts((prev) => {
+      // 같은 created_at 경계에서 중복이 들어올 수 있어 id로 dedup
       const seen = new Set(prev.map((p) => p.id));
       const next = list.filter((p) => !seen.has(p.id));
       return [...prev, ...next];
@@ -122,19 +115,7 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
     setLoadingMore(false);
   }, [loadingMore, hasMore, loading, posts, fetchPage]);
 
-  // 끝에 닿으면 다음 페이지 로드
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) loadMore();
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore]);
+  useInfiniteScroll(sentinelRef, loadMore, { enabled: hasMore });
 
   if (loading) {
     return (
@@ -156,46 +137,14 @@ export default function DiscussionFeed({ query = '' }: { query?: string }) {
 
   return (
     <div className="space-y-2">
-      {posts.map((post) => {
-        const profile = profileMap.get(post.user_id);
-        return (
-          <Link
-            key={post.id}
-            href={`/discussions/${post.id}`}
-            className="block rounded-xl border border-border bg-card/50 p-4 transition-colors hover:bg-accent/50"
-          >
-            <div className="mb-1.5 flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="shrink-0 rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
-                  {stockMap.get(post.stock_code) ?? post.stock_code}
-                </span>
-                <span className="truncate text-sm font-medium text-foreground">
-                  {profile?.nickname ?? '알 수 없음'}
-                </span>
-                {profile?.is_premium && (
-                  <span className="shrink-0 rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-amber-400 ring-1 ring-amber-500/30">
-                    PRO
-                  </span>
-                )}
-              </div>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {formatRelativeTime(post.created_at)}
-              </span>
-            </div>
-
-            <p className="line-clamp-3 whitespace-pre-wrap break-words text-sm text-foreground">
-              {post.content}
-            </p>
-
-            {post.like_count > 0 && (
-              <div className="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
-                <ThumbsUp size={11} />
-                <span>{post.like_count}</span>
-              </div>
-            )}
-          </Link>
-        );
-      })}
+      {posts.map((post) => (
+        <PostCard
+          key={post.id}
+          post={post}
+          stockName={stockMap.get(post.stock_code)}
+          profile={profileMap.get(post.user_id)}
+        />
+      ))}
 
       {hasMore && (
         <div ref={sentinelRef} className="flex justify-center py-4">

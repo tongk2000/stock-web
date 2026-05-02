@@ -68,3 +68,18 @@ export const RANKING = {
   VOLUME_SURGE_LOOKBACK_DAYS: 20,
   TRENDING_WINDOW_HOURS: 24,
 } as const;
+
+/**
+ * 페이지/쿼리별 결과 상한 (PAGE_SIZE / RANKING과 별개로 분리).
+ *
+ * - SEARCH_STOCKS              : /search 페이지 종목 검색 결과 최대 개수
+ * - SEARCH_POSTS               : /search 페이지 토론글 검색 결과 최대 개수
+ * - SITEMAP_MAX_POSTS          : sitemap.xml에 포함할 최대 게시글 수
+ * - COMPANY_INFO_LOOKBACK_DAYS : CompanyInfoSection의 5일/20일 고저가 계산용 캔들 lookback
+ */
+export const LIMITS = {
+  SEARCH_STOCKS: 10,
+  SEARCH_POSTS: 20,
+  SITEMAP_MAX_POSTS: 10000,
+  COMPANY_INFO_LOOKBACK_DAYS: 20,
+} as const;

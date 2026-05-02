@@ -3,11 +3,10 @@
  *
  * `?q=...` 쿼리 파라미터로 종목과 토론글을 동시에 검색합니다.
  *
- *   - 종목: stocks 테이블의 name / code 를 ILIKE 로 조회 (최대 STOCK_LIMIT)
- *   - 토론글: posts 테이블의 content 를 ILIKE 로 조회 (최대 POST_LIMIT, 최신순)
+ *   - 종목: stocks 테이블의 name / code 를 ILIKE 로 조회 (최대 LIMITS.SEARCH_STOCKS)
+ *   - 토론글: posts 테이블의 content 를 ILIKE 로 조회 (최대 LIMITS.SEARCH_POSTS, 최신순)
  *
- * 토론글은 상위 POST_LIMIT개만 보여주고, 더 많이 필요하면
- * `/discussions?q=...`로 넘겨 무한 스크롤을 이용합니다.
+ * 토론글이 상한에 도달하면 `/discussions?q=...`로 넘겨 무한 스크롤을 이용합니다.
  */
 
 import Link from 'next/link';
@@ -15,12 +14,10 @@ import { ThumbsUp } from 'lucide-react';
 import { createClient } from '@/lib/supabase/server';
 import { formatRelativeTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
+import { LIMITS } from '@/lib/constants';
 import SearchForm from '@/components/search/SearchForm';
 
 export const metadata = { title: '검색' };
-
-const STOCK_LIMIT = 10;
-const POST_LIMIT = 20;
 
 type StockRow = { code: string; name: string; market: 'KOSPI' | 'KOSDAQ' };
 type PostRow = {
@@ -62,13 +59,13 @@ export default async function SearchPage({
       .from('stocks')
       .select('code, name, market')
       .or(`name.ilike.%${escaped}%,code.ilike.%${escaped}%`)
-      .limit(STOCK_LIMIT),
+      .limit(LIMITS.SEARCH_STOCKS),
     supabase
       .from('posts')
       .select('id, content, created_at, like_count, stock_code, user_id')
       .ilike('content', `%${escaped}%`)
       .order('created_at', { ascending: false })
-      .limit(POST_LIMIT),
+      .limit(LIMITS.SEARCH_POSTS),
   ]);
 
   const stocks = (stocksRes.data ?? []) as StockRow[];
@@ -94,7 +91,7 @@ export default async function SearchPage({
     ]),
   );
 
-  const hasMorePosts = posts.length === POST_LIMIT;
+  const hasMorePosts = posts.length === LIMITS.SEARCH_POSTS;
 
   return (
     <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">

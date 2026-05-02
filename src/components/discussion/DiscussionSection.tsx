@@ -3,11 +3,13 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { ThumbsUp, ThumbsDown, Trash2, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { firstOrNull } from '@/lib/supabase/normalize';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import CommentSection from './CommentSection';
 import { formatRelativeTime } from '@/lib/format';
 import { PAGE_SIZE } from '@/lib/constants';
+import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
 
 type PostWithAuthor = {
   id: string;
@@ -104,18 +106,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
     setLoadingMore(false);
   }, [loadingMore, hasMore, loading, posts, roomId]);
 
-  useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0]?.isIntersecting) loadMore();
-      },
-      { rootMargin: '200px' },
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, [loadMore]);
+  useInfiniteScroll(sentinelRef, loadMore, { enabled: hasMore });
 
   // 현재 유저의 좋아요 / 싫어요 목록
   useEffect(() => {
@@ -325,7 +316,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       ) : (
         <div className="space-y-2">
           {posts.map((post) => {
-            const profile = Array.isArray(post.profiles) ? post.profiles[0] : post.profiles;
+            const profile = firstOrNull(post.profiles);
             const isMyPost = user?.id === post.user_id;
             return (
             <div key={post.id} className="rounded-xl border border-border bg-card/50 p-4">
