@@ -28,11 +28,15 @@ export function useTodayCandle(code: string): Candle | null {
   useEffect(() => {
     if (!isTradingDay()) return;
 
+    const todayStr = kstNow().toISOString().slice(0, 10);
+
     async function fetch_() {
       try {
         const res = await fetch(`/api/stock/today/${code}`);
         if (!res.ok) return;
         const data = await res.json();
+        // 응답 날짜가 오늘이 아니면 공휴일 — live 데이터로 취급하지 않음
+        if (data.date !== todayStr) return;
         setCandle(data);
       } catch {
         // network error — keep previous value
