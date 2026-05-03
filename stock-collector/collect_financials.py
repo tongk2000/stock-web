@@ -93,10 +93,12 @@ def extract_amount(items: list, account_names: list):
 
 
 def parse_financials(stock_code: str, year: int, quarter: int, items: list):
-    """재무제표 raw 항목에서 매출/영업이익/순이익/영업이익률을 추출하여 dict로 반환"""
+    """재무제표 raw 항목에서 손익·재무상태표 항목을 추출하여 dict로 반환"""
     revenue = extract_amount(items, ["매출액", "수익(매출액)"])
     operating_profit = extract_amount(items, ["영업이익", "영업이익(손실)"])
     net_income = extract_amount(items, ["당기순이익", "당기순이익(손실)"])
+    equity = extract_amount(items, ["자본총계"])
+    total_assets = extract_amount(items, ["자산총계"])
 
     operating_margin = None
     if revenue and operating_profit and revenue != 0:
@@ -110,6 +112,8 @@ def parse_financials(stock_code: str, year: int, quarter: int, items: list):
         "operating_profit": operating_profit,
         "net_income": net_income,
         "operating_margin": operating_margin,
+        "equity": equity,
+        "total_assets": total_assets,
     }
 
 

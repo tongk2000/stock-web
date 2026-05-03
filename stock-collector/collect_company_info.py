@@ -106,12 +106,8 @@ def collect_pykrx(date_str: str) -> dict[str, dict]:
             for code in fund_df.index:
                 row = fund_df.loc[code]
                 entry = result.setdefault(str(code).zfill(6), {})
-                entry["eps"] = _int_or_none(row.get("EPS"))
-                entry["per"] = _float_or_none(row.get("PER"))
-                entry["bps"] = _int_or_none(row.get("BPS"))
-                entry["pbr"] = _float_or_none(row.get("PBR"))
+                # EPS·PER·BPS·PBR·dividend_yield 는 calculate_ratios.py 가 계산해 저장
                 entry["dividend"] = _int_or_none(row.get("DPS"))
-                entry["dividend_yield"] = _float_or_none(row.get("DIV"))
 
         if foreign_df is not None:
             for code in foreign_df.index:
@@ -295,7 +291,7 @@ def run_stocks_update(
         print("[stocks] 업데이트할 데이터 없음")
 
 
-_FINANCIAL_FIELDS = ("eps", "per", "pbr", "bps", "market_cap", "dividend", "dividend_yield")
+_FINANCIAL_FIELDS = ("dividend",)  # 나머지 비율은 calculate_ratios.py 가 계산해 저장
 
 
 def run_financials_update(pykrx_data: dict[str, dict]) -> None:

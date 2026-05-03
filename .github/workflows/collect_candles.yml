@@ -29,3 +29,9 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DART_API_KEY: ${{ secrets.DART_API_KEY }}
         run: python stock-collector/collect_candles.py
+
+      - name: 재무비율 계산 (PER·PBR·EPS·BPS·ROE·부채비율·시가총액)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: python stock-collector/calculate_ratios.py
