@@ -14,6 +14,8 @@ import { createClient } from '@/lib/supabase/client';
 import { useFavorites } from '@/contexts/FavoritesContext';
 import { cn } from '@/lib/utils';
 
+const POLL_MS = 30_000;
+
 type PriceInfo = {
   close: number;
   change: number;
@@ -30,12 +32,17 @@ export default function FavoriteStockPrices() {
   const codesKey = codes.join(',');
 
   useEffect(() => {
-    if (codes.length === 0) return;
+    if (codes.length === 0) {
+      setPriceMap(new Map());
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
+    let timer: ReturnType<typeof setInterval> | null = null;
     setLoading(true);
 
-    (async () => {
+    async function fetchDbPrices() {
       const supabase = createClient();
       const { data } = await supabase
         .from('candles')
@@ -65,12 +72,38 @@ export default function FavoriteStockPrices() {
         const changeRate = prev ? (change / prev.close) * 100 : 0;
         next.set(code, { close: latest.close, change, changeRate, date: latest.date });
       }
-      setPriceMap(next);
+      if (cancelled) return;
+      setPriceMap((prev) => new Map([...next, ...prev]));
+    }
+
+    async function fetchLivePrices() {
+      try {
+        const res = await fetch(`/api/stock/today?codes=${encodeURIComponent(codesKey)}`, {
+          cache: 'no-store',
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        const prices = data.prices as Record<string, PriceInfo> | undefined;
+        if (!prices) return;
+        if (cancelled) return;
+        setPriceMap((prev) => new Map([...prev, ...Object.entries(prices)]));
+      } catch {
+        // keep the latest known prices
+      }
+    }
+
+    (async () => {
+      await fetchDbPrices();
+      if (cancelled) return;
+      await fetchLivePrices();
+      if (cancelled) return;
       setLoading(false);
+      timer = setInterval(fetchLivePrices, POLL_MS);
     })();
 
     return () => {
       cancelled = true;
+      if (timer) clearInterval(timer);
     };
   }, [codes, codesKey]);
 
