@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import type { Candle } from '@/types/stock';
 
-const POLL_MS = 60_000;
+const POLL_MS = 30_000;
 
 function kstNow() {
   return new Date(Date.now() + 9 * 60 * 60 * 1000);
@@ -56,9 +56,9 @@ export function useTodayCandle(code: string): Candle | null {
       }
     }
 
-    // 초기 fetch 후 장이 열려있을 때만 폴링 시작
-    fetch_().then((hasTodayData) => {
-      if (hasTodayData && isMarketOpen()) {
+    // 초기 fetch 후 장중/마감 직후 배치 수집 전까지 30초마다 재확인
+    fetch_().then(() => {
+      if (isBeforeBatchCollection()) {
         timerRef.current = setInterval(() => {
           if (isBeforeBatchCollection()) {
             fetch_();
