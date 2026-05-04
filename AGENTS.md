@@ -115,6 +115,17 @@ StockChartSection (클라이언트)
 - `sitemap.ts` / `robots.ts` / `generateMetadata`는 모두 `ENGAGEMENT_THRESHOLD`를 공유합니다.
 - 절대 URL은 `NEXT_PUBLIC_SITE_URL` 환경변수를 사용하세요.
 
+## 토론 도배 방지 메모
+
+- 글/댓글 재등록 텀은 클라이언트와 서버 양쪽에서 검증하되, 최종 차단은 서버 또는 Supabase RPC/DB 레이어에서 강제하세요.
+- 초기 정책은 단순하게 시작합니다: 글은 `user_id`당 약 60초, 댓글은 `user_id`당 약 10~15초 쿨다운을 기준으로 검토합니다.
+- 동일 본문 반복 차단은 "유사도"가 아니라 "정규화 후 완전 동일"만 우선 막습니다.
+  - 정규화 기준 예: `trim()`, 소문자 변환, 연속 공백을 단일 공백으로 치환.
+  - 저장은 원문 중복보다 `content_hash` 컬럼을 우선 검토합니다.
+  - 차단 범위는 글의 경우 같은 `room_id`, 댓글의 경우 같은 `post_id` 안에서 최근 5분 내 같은 `user_id` + 같은 `content_hash`를 기준으로 합니다.
+- 시간 창이 있는 중복 차단은 unique constraint보다 insert 직전 서버/RPC 조회로 처리하는 편이 단순합니다.
+- 클라이언트의 버튼 비활성화/남은 시간 표시는 UX 보조일 뿐, 보안 경계로 취급하지 마세요.
+
 ## 변경 시 체크리스트
 
 - [ ] 페이지네이션/임계값/스토리지 키를 추가하거나 바꿀 땐 `src/lib/constants.ts`에서.
