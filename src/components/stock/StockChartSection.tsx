@@ -149,7 +149,9 @@ export default function StockChartSection({ code, isTradingDay }: Props) {
   const allCandlesWithToday = useMemo(() => {
     if (!todayCandle) return allCandles;
     const last = allCandles[allCandles.length - 1];
-    if (last?.date === todayCandle.date) return allCandles; // 이미 DB에 있음
+    if (last?.date === todayCandle.date) {
+      return [...allCandles.slice(0, -1), todayCandle];
+    }
     return [...allCandles, todayCandle];
   }, [allCandles, todayCandle]);
 

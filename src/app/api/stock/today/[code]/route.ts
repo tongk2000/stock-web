@@ -10,6 +10,11 @@ function todayKST(): string {
   return kst.toISOString().slice(0, 10);
 }
 
+function parseTradeDate(raw: string | null | undefined): string {
+  if (!raw) return todayKST();
+  return raw.replace(/\./g, '-').slice(0, 10);
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ code: string }> },
@@ -37,9 +42,8 @@ export async function GET(
     return NextResponse.json({ error: 'no data' }, { status: 404 });
   }
 
-  // localTradedAt: "2025.05.02" → "2025-05-02"
-  const rawDate: string = d.localTradedAt ?? '';
-  const date = rawDate.replace(/\./g, '-') || todayKST();
+  // localTradedAt can be "2025.05.02" or "2026-05-04T13:36:21+09:00".
+  const date = parseTradeDate(d.localTradedAt);
 
   return NextResponse.json({ date, open, high, low, close, volume });
 }

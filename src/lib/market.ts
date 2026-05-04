@@ -16,6 +16,10 @@ function kstToday(): string {
   return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
 }
 
+function parseTradeDate(raw: string | null | undefined): string {
+  return (raw ?? '').replace(/\./g, '-').slice(0, 10);
+}
+
 /** KST 기준 토/일 여부 */
 function isWeekend(): boolean {
   const day = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCDay();
@@ -36,7 +40,7 @@ const _checkTradingDay = unstable_cache(
       });
       if (!res.ok) return true;
       const d = await res.json();
-      const marketDate = (d.localTradedAt ?? '').replace(/\./g, '-');
+      const marketDate = parseTradeDate(d.localTradedAt);
       return marketDate === date;
     } catch {
       return true;
