@@ -23,6 +23,10 @@ jobs:
       - name: 마이그레이션 적용
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
-          supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_REF }}
+          test -n "$SUPABASE_ACCESS_TOKEN" || (echo "Missing required secret: SUPABASE_ACCESS_TOKEN" && exit 1)
+          test -n "$SUPABASE_PROJECT_REF" || (echo "Missing required secret: SUPABASE_PROJECT_REF" && exit 1)
+
+          supabase link --project-ref "$SUPABASE_PROJECT_REF"
           supabase db push
