@@ -76,10 +76,19 @@ export const RANKING = {
  * - SEARCH_POSTS               : /search 페이지 토론글 검색 결과 최대 개수
  * - SITEMAP_MAX_POSTS          : sitemap.xml에 포함할 최대 게시글 수
  * - COMPANY_INFO_LOOKBACK_DAYS : CompanyInfoSection의 5일/20일 고저가 계산용 캔들 lookback
+ * - BATCH_PRICE_CODES          : `/api/stock/today` 단일 요청에서 허용하는 종목 수 상한
  */
 export const LIMITS = {
   SEARCH_STOCKS: 10,
   SEARCH_POSTS: 20,
   SITEMAP_MAX_POSTS: 10000,
   COMPANY_INFO_LOOKBACK_DAYS: 20,
+  BATCH_PRICE_CODES: 50,
 } as const;
+
+/**
+ * 장중 실시간 캔들 폴링 주기 (밀리초).
+ * useTodayCandle 훅이 Naver 시세 API를 다시 찌르는 간격입니다.
+ * 너무 짧으면 외부 API에 부담이 되고, 너무 길면 차트가 멈춰 보입니다.
+ */
+export const LIVE_CANDLE_POLL_MS = 30_000;

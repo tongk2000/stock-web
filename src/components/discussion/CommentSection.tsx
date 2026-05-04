@@ -1,3 +1,21 @@
+/**
+ * CommentSection
+ *
+ * 게시글 하나에 대한 댓글/답글 트리. 토론방 피드와 게시글 상세 페이지에서 모두 사용합니다.
+ *
+ * 구조:
+ *   - 데이터는 평탄화되어 있습니다 — 답글의 `parent_id`는 항상 최상위 댓글의 id를 가리킵니다.
+ *     (대댓글의 대댓글도 같은 부모로 묶음 → 깊이 1단계만 렌더링)
+ *   - 답글 작성 시 `reply_to_user_id`로 멘션 대상을 기록해 "@nickname" 표시에 사용합니다.
+ *
+ * 실시간:
+ *   - INSERT: 본인이 등록한 row는 insert().select()로 즉시 받아 미리 추가, 실시간 핸들러는 id로 dedup.
+ *   - DELETE: payload.old.id 만 오므로 그 id를 prev에서 걸러냅니다.
+ *
+ * 조인 정규화:
+ *   - profiles 외래키는 Supabase가 객체 1개 또는 1요소 배열로 줄 수 있어 `firstOrNull`로 통일.
+ */
+
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';

@@ -1,9 +1,21 @@
+/**
+ * DiscussionSection
+ *
+ * 종목별 토론방 (/stocks/[code] 하단)에 표시되는 글 작성 + 피드 + 좋아요/싫어요 + 댓글 토글.
+ *
+ * - 첫 페이지(PAGE_SIZE.ROOM)를 즉시 로드하고, 무한 스크롤로 과거 글을 이어 붙입니다.
+ * - postgres_changes 채널로 INSERT/UPDATE/DELETE를 실시간 반영해 새로고침 없이 동기화됩니다.
+ * - 좋아요/싫어요는 optimistic update + 본인 글 비활성화 + 상호배타 토글 규칙을 따릅니다.
+ *   (실제 카운트는 DB 트리거가 posts 테이블에 갱신하므로 클라이언트는 row만 add/remove.)
+ */
+
 'use client';
 
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { ThumbsUp, ThumbsDown, Trash2, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { firstOrNull } from '@/lib/supabase/normalize';
+import { addReaction, removeReaction } from '@/lib/post-reactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import CommentSection from './CommentSection';
@@ -210,7 +222,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       // 좋아요 취소
       setLikedSet((prev) => { const n = new Set(prev); n.delete(postId); return n; });
       setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, like_count: p.like_count - 1 } : p));
-      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+      await removeReaction(supabase, postId, user.id, 'like');
     } else {
       // 좋아요 추가 (싫어요 있으면 동시에 제거)
       setLikedSet((prev) => { const n = new Set(prev); n.add(postId); return n; });
@@ -224,9 +236,9 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       }));
       if (isDisliked) {
         setDislikedSet((prev) => { const n = new Set(prev); n.delete(postId); return n; });
-        await supabase.from('post_dislikes').delete().eq('post_id', postId).eq('user_id', user.id);
+        await removeReaction(supabase, postId, user.id, 'dislike');
       }
-      await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+      await addReaction(supabase, postId, user.id, 'like');
     }
   }, [user, likedSet, dislikedSet, signInWithGoogle]);
 
@@ -243,7 +255,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       // 싫어요 취소
       setDislikedSet((prev) => { const n = new Set(prev); n.delete(postId); return n; });
       setPosts((prev) => prev.map((p) => p.id === postId ? { ...p, dislike_count: p.dislike_count - 1 } : p));
-      await supabase.from('post_dislikes').delete().eq('post_id', postId).eq('user_id', user.id);
+      await removeReaction(supabase, postId, user.id, 'dislike');
     } else {
       // 싫어요 추가 (좋아요 있으면 동시에 제거)
       setDislikedSet((prev) => { const n = new Set(prev); n.add(postId); return n; });
@@ -257,9 +269,9 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
       }));
       if (isLiked) {
         setLikedSet((prev) => { const n = new Set(prev); n.delete(postId); return n; });
-        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        await removeReaction(supabase, postId, user.id, 'like');
       }
-      await supabase.from('post_dislikes').insert({ post_id: postId, user_id: user.id });
+      await addReaction(supabase, postId, user.id, 'dislike');
     }
   }, [user, likedSet, dislikedSet, signInWithGoogle]);
 

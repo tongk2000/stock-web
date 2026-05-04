@@ -1,6 +1,21 @@
+/**
+ * GET /api/stocks/[code]/company-info
+ *
+ * 종목 상세의 "기업정보" 탭에 필요한 데이터를 한 번에 모아 응답합니다.
+ *   - stocks 테이블 메타데이터 (액면가/대용가/상장일 등)
+ *   - v_latest_financials 뷰 (PER/PBR/ROE/EPS 등 최신 분기)
+ *   - 최근 252영업일 캔들 (5/20일 고저가, 52주 고저가 폴백)
+ *   - Naver `/integration` 응답 (DB가 비어있을 때 PER/시총 등 보강)
+ *
+ * Naver 보강은 1.2초 타임아웃과 try/catch로 감싸 외부 API가 죽어도 페이지가 멈추지 않습니다.
+ * 일부 컬럼이 빠진 마이그레이션 환경(스키마 fallback)을 위해 select 실패 시 축소된
+ * 컬럼 셋으로 한 번 더 조회합니다.
+ */
+
 import { NextResponse } from 'next/server';
 import { LIMITS } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/server';
+import { parseDecimalOrNull, parseKrwAmount } from '@/lib/parsers';
 
 type StockRow = {
   shares_outstanding: number | null;
@@ -53,31 +68,9 @@ type NaverSupplement = {
   low_52w: number | null;
 };
 
+/** Supabase 응답에서 error가 있으면 null로, 없으면 data를 그대로 반환합니다. */
 function okData<T>(data: T | null, error: unknown): T | null {
   return error ? null : data;
-}
-
-function parseNumber(value: string | undefined): number | null {
-  if (!value) return null;
-  const num = Number.parseFloat(value.replace(/,/g, '').replace(/[^\d.-]/g, ''));
-  return Number.isFinite(num) ? num : null;
-}
-
-function parseKrwAmount(value: string | undefined): number | null {
-  if (!value) return null;
-
-  const compact = value.replace(/,/g, '').replace(/\s+/g, '');
-  const trillion = compact.match(/(-?\d+(?:\.\d+)?)조/);
-  const hundredMillion = compact.match(/(-?\d+(?:\.\d+)?)억/);
-
-  if (trillion || hundredMillion) {
-    return Math.round(
-      (trillion ? Number.parseFloat(trillion[1]) * 1e12 : 0) +
-        (hundredMillion ? Number.parseFloat(hundredMillion[1]) * 1e8 : 0),
-    );
-  }
-
-  return parseNumber(value);
 }
 
 function infoValue(infos: NaverInfo[] | undefined, code: string): string | undefined {
@@ -99,15 +92,15 @@ async function fetchNaverSupplement(code: string): Promise<NaverSupplement | nul
 
     return {
       market_cap: parseKrwAmount(infoValue(infos, 'marketValue')),
-      per: parseNumber(infoValue(infos, 'per')),
-      eps: parseNumber(infoValue(infos, 'eps')),
-      pbr: parseNumber(infoValue(infos, 'pbr')),
-      bps: parseNumber(infoValue(infos, 'bps')),
-      dividend: parseNumber(infoValue(infos, 'dividend')),
-      dividend_yield: parseNumber(infoValue(infos, 'dividendYieldRatio')),
-      foreign_ownership_ratio: parseNumber(infoValue(infos, 'foreignRate')),
-      high_52w: parseNumber(infoValue(infos, 'highPriceOf52Weeks')),
-      low_52w: parseNumber(infoValue(infos, 'lowPriceOf52Weeks')),
+      per: parseDecimalOrNull(infoValue(infos, 'per')),
+      eps: parseDecimalOrNull(infoValue(infos, 'eps')),
+      pbr: parseDecimalOrNull(infoValue(infos, 'pbr')),
+      bps: parseDecimalOrNull(infoValue(infos, 'bps')),
+      dividend: parseDecimalOrNull(infoValue(infos, 'dividend')),
+      dividend_yield: parseDecimalOrNull(infoValue(infos, 'dividendYieldRatio')),
+      foreign_ownership_ratio: parseDecimalOrNull(infoValue(infos, 'foreignRate')),
+      high_52w: parseDecimalOrNull(infoValue(infos, 'highPriceOf52Weeks')),
+      low_52w: parseDecimalOrNull(infoValue(infos, 'lowPriceOf52Weeks')),
     };
   } catch {
     return null;

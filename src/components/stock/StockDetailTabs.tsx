@@ -1,3 +1,13 @@
+/**
+ * StockDetailTabs
+ *
+ * 종목 상세 페이지(/stocks/[code])의 하단 탭 컨테이너입니다.
+ * 기본 활성 탭은 '토론방' — 사용자가 종목에 들어왔을 때 가장 자주 보는 영역.
+ *
+ * 미구현 탭(시세/뉴스/공시/수급현황)은 자리만 잡아 두고 Placeholder를 렌더링합니다.
+ * roomId가 없으면 토론방 탭은 안내 문구만 표시합니다 (공식 토론방 미생성 종목).
+ */
+
 'use client';
 
 import { useState } from 'react';

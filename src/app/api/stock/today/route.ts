@@ -1,20 +1,16 @@
+/**
+ * GET /api/stock/today?codes=005930,000660,...
+ *
+ * 여러 종목의 오늘 종가/등락을 한 번에 조회합니다 (즐겨찾기 사이드바용 일괄 폴링).
+ *
+ * 응답: { prices: { [code]: { close, change, changeRate, date } } } — 실패한 종목은 키가 빠짐.
+ * 입력 검증: 6자리 숫자 종목코드만 허용하고 LIMITS.BATCH_PRICE_CODES개로 자릅니다.
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-
-const MAX_CODES = 50;
-
-function parseNum(value: unknown): number {
-  if (typeof value !== 'string') return 0;
-  return parseInt(value.replace(/[^\d-]/g, ''), 10) || 0;
-}
-
-function parseFloatNum(value: unknown): number {
-  if (typeof value !== 'string') return 0;
-  return Number.parseFloat(value.replace(/,/g, '')) || 0;
-}
-
-function parseTradeDate(raw: string | null | undefined): string {
-  return (raw ?? '').replace(/\./g, '-').slice(0, 10);
-}
+import { LIMITS } from '@/lib/constants';
+import { parseFloat0, parseInt0 } from '@/lib/parsers';
+import { parseTradeDate } from '@/lib/time';
 
 async function fetchPrice(code: string) {
   const res = await fetch(`https://m.stock.naver.com/api/stock/${code}/basic`, {
@@ -25,13 +21,13 @@ async function fetchPrice(code: string) {
   if (!res.ok) return null;
 
   const data = await res.json();
-  const close = parseNum(data.closePrice);
+  const close = parseInt0(data.closePrice);
   if (!close) return null;
 
   return {
     close,
-    change: parseNum(data.compareToPreviousClosePrice),
-    changeRate: parseFloatNum(data.fluctuationsRatio),
+    change: parseInt0(data.compareToPreviousClosePrice),
+    changeRate: parseFloat0(data.fluctuationsRatio),
     date: parseTradeDate(data.localTradedAt),
   };
 }
@@ -41,7 +37,7 @@ export async function GET(req: NextRequest) {
     .split(',')
     .map((code) => code.trim())
     .filter((code) => /^\d{6}$/.test(code))
-    .slice(0, MAX_CODES);
+    .slice(0, LIMITS.BATCH_PRICE_CODES);
 
   if (codes.length === 0) {
     return NextResponse.json({ prices: {} });

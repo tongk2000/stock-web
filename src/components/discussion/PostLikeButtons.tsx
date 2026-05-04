@@ -12,6 +12,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ThumbsUp, ThumbsDown, MessageSquare } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
+import { addReaction, removeReaction } from '@/lib/post-reactions';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 
@@ -93,16 +94,16 @@ export default function PostLikeButtons({
     if (liked) {
       setLiked(false);
       setLikes((n) => n - 1);
-      await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+      await removeReaction(supabase, postId, user.id, 'like');
     } else {
       setLiked(true);
       setLikes((n) => n + 1);
       if (disliked) {
         setDisliked(false);
         setDislikes((n) => n - 1);
-        await supabase.from('post_dislikes').delete().eq('post_id', postId).eq('user_id', user.id);
+        await removeReaction(supabase, postId, user.id, 'dislike');
       }
-      await supabase.from('post_likes').insert({ post_id: postId, user_id: user.id });
+      await addReaction(supabase, postId, user.id, 'like');
     }
   }, [user, isMyPost, liked, disliked, postId]);
 
@@ -112,16 +113,16 @@ export default function PostLikeButtons({
     if (disliked) {
       setDisliked(false);
       setDislikes((n) => n - 1);
-      await supabase.from('post_dislikes').delete().eq('post_id', postId).eq('user_id', user.id);
+      await removeReaction(supabase, postId, user.id, 'dislike');
     } else {
       setDisliked(true);
       setDislikes((n) => n + 1);
       if (liked) {
         setLiked(false);
         setLikes((n) => n - 1);
-        await supabase.from('post_likes').delete().eq('post_id', postId).eq('user_id', user.id);
+        await removeReaction(supabase, postId, user.id, 'like');
       }
-      await supabase.from('post_dislikes').insert({ post_id: postId, user_id: user.id });
+      await addReaction(supabase, postId, user.id, 'dislike');
     }
   }, [user, isMyPost, liked, disliked, postId]);
 

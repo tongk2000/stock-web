@@ -10,21 +10,7 @@
  */
 
 import { unstable_cache } from 'next/cache';
-
-/** 한국 시간(KST = UTC+9) 기준 오늘 날짜를 'YYYY-MM-DD' 문자열로 반환 */
-function kstToday(): string {
-  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
-
-function parseTradeDate(raw: string | null | undefined): string {
-  return (raw ?? '').replace(/\./g, '-').slice(0, 10);
-}
-
-/** KST 기준 토/일 여부 */
-function isWeekend(): boolean {
-  const day = new Date(Date.now() + 9 * 60 * 60 * 1000).getUTCDay();
-  return day === 0 || day === 6;
-}
+import { isKstWeekend, kstToday, parseTradeDate } from '@/lib/time';
 
 /**
  * 삼성전자(005930)의 마지막 체결일이 인자 날짜와 같으면 영업일로 간주합니다.
@@ -52,6 +38,6 @@ const _checkTradingDay = unstable_cache(
 
 /** 오늘이 KRX 영업일인지 반환 (주말/공휴일이면 false). */
 export async function getIsTradingDay(): Promise<boolean> {
-  if (isWeekend()) return false;
+  if (isKstWeekend()) return false;
   return _checkTradingDay(kstToday());
 }

@@ -1,3 +1,13 @@
+/**
+ * CompanyInfoSection
+ *
+ * 종목 상세의 "기업정보" 탭 본문입니다. `/api/stocks/[code]/company-info`에서
+ * stocks · v_latest_financials · 캔들 · Naver 보강 데이터를 합쳐 받아 렌더링합니다.
+ *
+ * 데이터가 비어 있는 셀은 '-'로 표시하고, 부분 응답(축소 select 폴백)도 그대로 표시할 수 있도록
+ * 모든 필드를 nullable로 받습니다. 페이지 자체가 SEO 색인 대상이 아니므로 SSR 없이 클라이언트에서 fetch.
+ */
+
 'use client';
 
 import { useEffect, useState } from 'react';
