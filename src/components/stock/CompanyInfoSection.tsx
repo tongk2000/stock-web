@@ -1,9 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { createClient } from '@/lib/supabase/client';
 import { cn } from '@/lib/utils';
-import { LIMITS } from '@/lib/constants';
 
 interface CompanyInfoData {
   // stocks
@@ -72,121 +70,41 @@ interface RowItem {
 export default function CompanyInfoSection({ stockCode }: { stockCode: string }) {
   const [data, setData] = useState<CompanyInfoData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const supabase = createClient();
+    const controller = new AbortController();
 
     async function load() {
+      setLoading(true);
+      setError(null);
+
       try {
-        // 기존 컬럼(항상 존재)과 신규 컬럼(migration 미적용 시 실패 가능)을 분리해서
-        // 신규 쪽이 실패해도 기존 데이터가 정상 표시되도록 합니다.
-        const [
-          stockBaseRes,
-          stockExtRes,
-          dailyRes,
-          financialsBaseRes,
-          financialsExtRes,
-          extremesRes,
-          candlesRes,
-        ] = await Promise.all([
-          // stocks — 기존 컬럼 (20260419000002에서 추가)
-          supabase
-            .from('stocks')
-            .select('shares_outstanding')
-            .eq('code', stockCode)
-            .single(),
-          // stocks — 신규 컬럼 (20260429000001에서 추가, migration 전에는 null 반환)
-          supabase
-            .from('stocks')
-            .select('description, face_value, substitute_value, listing_date, ipo_price, capital, foreign_ownership_ratio')
-            .eq('code', stockCode)
-            .single(),
-          // v_daily_change — 컬럼 변경 없음
-          supabase
-            .from('v_daily_change')
-            .select('today_close, prev_close')
-            .eq('stock_code', stockCode)
-            .single(),
-          // v_latest_financials — 기존 컬럼
-          supabase
-            .from('v_latest_financials')
-            .select('year, quarter, net_income, market_cap, per, eps, pbr, roe')
-            .eq('stock_code', stockCode)
-            .single(),
-          // v_latest_financials — 신규 컬럼 (migration 전에는 null 반환)
-          supabase
-            .from('v_latest_financials')
-            .select('bps, ev_ebitda, dividend, dividend_yield, credit_balance_ratio')
-            .eq('stock_code', stockCode)
-            .single(),
-          // v_52w_extremes — 컬럼 변경 없음
-          supabase
-            .from('v_52w_extremes')
-            .select('high_252, low_252')
-            .eq('stock_code', stockCode)
-            .single(),
-          // candles — 5일/20일 고저가 계산용 (lookback = LIMITS.COMPANY_INFO_LOOKBACK_DAYS)
-          supabase
-            .from('candles')
-            .select('high, low')
-            .eq('stock_code', stockCode)
-            .eq('exchange', 'KRX')
-            .eq('candle_type', 'daily')
-            .order('date', { ascending: false })
-            .limit(LIMITS.COMPANY_INFO_LOOKBACK_DAYS),
-        ]);
-
-        type CandleRow = { high: number; low: number };
-        const candles: CandleRow[] = candlesRes.data ?? [];
-        const high_5d = candles.slice(0, 5).reduce<number | null>((acc, c) => (acc == null ? c.high : Math.max(acc, c.high)), null);
-        const low_5d = candles.slice(0, 5).reduce<number | null>((acc, c) => (acc == null ? c.low : Math.min(acc, c.low)), null);
-        const high_20d = candles.reduce<number | null>((acc, c) => (acc == null ? c.high : Math.max(acc, c.high)), null);
-        const low_20d = candles.reduce<number | null>((acc, c) => (acc == null ? c.low : Math.min(acc, c.low)), null);
-
-        const sb = stockBaseRes.data;
-        const se = stockExtRes.data;
-        const d = dailyRes.data;
-        const fb = financialsBaseRes.data;
-        const fe = financialsExtRes.data;
-        const e = extremesRes.data;
-
-        setData({
-          description: se?.description ?? null,
-          face_value: se?.face_value ?? null,
-          substitute_value: se?.substitute_value ?? null,
-          listing_date: se?.listing_date ?? null,
-          ipo_price: se?.ipo_price ?? null,
-          shares_outstanding: sb?.shares_outstanding ?? null,
-          capital: se?.capital ?? null,
-          foreign_ownership_ratio: se?.foreign_ownership_ratio ?? null,
-          today_close: d?.today_close ?? null,
-          prev_close: d?.prev_close ?? null,
-          year: fb?.year ?? null,
-          quarter: fb?.quarter ?? null,
-          net_income: fb?.net_income ?? null,
-          market_cap: fb?.market_cap ?? null,
-          per: fb?.per ?? null,
-          eps: fb?.eps ?? null,
-          pbr: fb?.pbr ?? null,
-          roe: fb?.roe ?? null,
-          bps: fe?.bps ?? null,
-          ev_ebitda: fe?.ev_ebitda ?? null,
-          dividend: fe?.dividend ?? null,
-          dividend_yield: fe?.dividend_yield ?? null,
-          credit_balance_ratio: fe?.credit_balance_ratio ?? null,
-          high_5d,
-          low_5d,
-          high_20d,
-          low_20d,
-          high_52w: e?.high_252 ?? null,
-          low_52w: e?.low_252 ?? null,
+        const res = await fetch(`/api/stocks/${stockCode}/company-info`, {
+          signal: controller.signal,
         });
+        const json = await res.json();
+
+        if (!res.ok) {
+          throw new Error(json.error ?? 'load failed');
+        }
+
+        setData(json.data ?? null);
+      } catch (err) {
+        if (err instanceof DOMException && err.name === 'AbortError') return;
+        setData(null);
+        setError('기업정보를 불러오지 못했습니다.');
       } finally {
+        if (controller.signal.aborted) return;
         setLoading(false);
       }
     }
 
     load();
+
+    return () => {
+      controller.abort();
+    };
   }, [stockCode]);
 
   if (loading) {
@@ -197,10 +115,10 @@ export default function CompanyInfoSection({ stockCode }: { stockCode: string })
     );
   }
 
-  if (!data) {
+  if (!data || error) {
     return (
       <div className="flex min-h-[240px] items-center justify-center text-sm text-muted-foreground">
-        정보를 불러올 수 없습니다.
+        {error ?? '정보를 불러올 수 없습니다.'}
       </div>
     );
   }
