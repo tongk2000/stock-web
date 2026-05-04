@@ -386,10 +386,15 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       // 크로스헤어가 정확히 가리키는 날짜를 기록 (클릭 시 이 값 사용)
       hoveredDateRef.current = candle.date;
 
-      // 가로 크로스헤어를 항상 종가에 고정 — tooltip on/off와 무관하게 항상 실행
-      settingCrosshair = true;
-      chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
-      settingCrosshair = false;
+      const closeY = candleSeries.priceToCoordinate(candle.close) ?? param.point.y;
+
+      // 가로 크로스헤어를 종가에 고정하되, 이미 종가 위치라면 재설정하지 않음.
+      // lightweight-charts가 crosshairMove를 다시 발행할 수 있어 무조건 호출하면 재귀 루프가 될 수 있다.
+      if (Math.abs(param.point.y - closeY) > 0.5) {
+        settingCrosshair = true;
+        chart.setCrosshairPosition(candle.close, param.time as Time, candleSeries);
+        settingCrosshair = false;
+      }
 
       // ── 보조지표 패널 legend 업데이트 (항상 실행) ─────────────────────────────
       const sd = param.seriesData as Map<ISeriesApi<'Line'>, unknown>;
@@ -514,7 +519,6 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       tooltip.style.display = 'block';
 
       // ── 위치: 크로스헤어 오른쪽, 종가 Y ──────────────────────────────────────
-      const closeY = candleSeries.priceToCoordinate(candle.close) ?? param.point.y;
       const cw = container.clientWidth;
       const tw = tooltip.offsetWidth  || 150;
       const th = tooltip.offsetHeight || 100;
