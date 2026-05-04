@@ -25,15 +25,12 @@ function isBeforeBatchCollection(): boolean {
   return mins >= 9 * 60 && mins < 16 * 60 + 20;
 }
 
-// isTradingDay: 서버에서 판별 후 내려온 값. false면 fetch 자체를 하지 않음
-export function useTodayCandle(code: string, isTradingDay: boolean): Candle | null {
+export function useTodayCandle(code: string): Candle | null {
   const [candle, setCandle] = useState<Candle | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
-    if (!isTradingDay) return;
-
-    const todayStr = kstNow().toISOString().slice(0, 10);
+    setCandle(null);
 
     function stopPolling() {
       if (timerRef.current) {
@@ -42,23 +39,26 @@ export function useTodayCandle(code: string, isTradingDay: boolean): Candle | nu
       }
     }
 
-    async function fetch_() {
+    async function fetch_(): Promise<boolean> {
       try {
         const res = await fetch(`/api/stock/today/${code}`);
-        if (!res.ok) return;
+        if (!res.ok) return false;
         const data = await res.json();
-        if (data.date !== todayStr) return;
+        const todayStr = kstNow().toISOString().slice(0, 10);
+        if (data.date !== todayStr) return false;
         setCandle(data);
         // 장 종료 확인 → 더 이상 가격이 안 바뀌므로 폴링 중단
         if (!isMarketOpen()) stopPolling();
+        return true;
       } catch {
         // network error — keep previous value
+        return false;
       }
     }
 
     // 초기 fetch 후 장이 열려있을 때만 폴링 시작
-    fetch_().then(() => {
-      if (isMarketOpen()) {
+    fetch_().then((hasTodayData) => {
+      if (hasTodayData && isMarketOpen()) {
         timerRef.current = setInterval(() => {
           if (isBeforeBatchCollection()) {
             fetch_();
@@ -70,7 +70,7 @@ export function useTodayCandle(code: string, isTradingDay: boolean): Candle | nu
     });
 
     return () => stopPolling();
-  }, [code, isTradingDay]);
+  }, [code]);
 
   return candle;
 }
