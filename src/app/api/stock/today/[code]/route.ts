@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 
-function parseNum(s: string | undefined): number {
-  if (!s) return 0;
-  return parseInt(s.replace(/,/g, ''), 10) || 0;
+function parseNum(value: unknown): number {
+  if (typeof value !== 'string') return 0;
+  return parseInt(value.replace(/[^\d-]/g, ''), 10) || 0;
 }
 
 function todayKST(): string {
@@ -15,14 +15,24 @@ function parseTradeDate(raw: string | null | undefined): string {
   return raw.replace(/\./g, '-').slice(0, 10);
 }
 
+type NaverInfo = {
+  code?: string;
+  value?: string;
+};
+
+function getInfoNum(infos: NaverInfo[] | undefined, code: string): number {
+  return parseNum(infos?.find((info) => info.code === code)?.value);
+}
+
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ code: string }> },
 ) {
   const { code } = await params;
 
+  const headers = { 'User-Agent': 'Mozilla/5.0' };
   const res = await fetch(`https://m.stock.naver.com/api/stock/${code}/basic`, {
-    headers: { 'User-Agent': 'Mozilla/5.0' },
+    headers,
     cache: 'no-store',
   });
 
@@ -32,15 +42,34 @@ export async function GET(
 
   const d = await res.json();
 
-  const open = parseNum(d.openPrice);
-  const high = parseNum(d.highPrice);
-  const low = parseNum(d.lowPrice);
+  let open = parseNum(d.openPrice);
+  let high = parseNum(d.highPrice);
+  let low = parseNum(d.lowPrice);
   const close = parseNum(d.closePrice);
-  const volume = parseNum(d.accumulatedTradingVolume);
+  let volume = parseNum(d.accumulatedTradingVolume);
+
+  if (!open || !high || !low || !volume) {
+    const integrationRes = await fetch(`https://m.stock.naver.com/api/stock/${code}/integration`, {
+      headers,
+      cache: 'no-store',
+    });
+
+    if (integrationRes.ok) {
+      const integration = await integrationRes.json();
+      const infos = integration.totalInfos as NaverInfo[] | undefined;
+      open ||= getInfoNum(infos, 'openPrice');
+      high ||= getInfoNum(infos, 'highPrice');
+      low ||= getInfoNum(infos, 'lowPrice');
+      volume ||= getInfoNum(infos, 'accumulatedTradingVolume');
+    }
+  }
 
   if (!open || !close) {
     return NextResponse.json({ error: 'no data' }, { status: 404 });
   }
+
+  high ||= Math.max(open, close);
+  low ||= Math.min(open, close);
 
   // localTradedAt can be "2025.05.02" or "2026-05-04T13:36:21+09:00".
   const date = parseTradeDate(d.localTradedAt);
