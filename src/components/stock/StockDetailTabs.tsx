@@ -4,7 +4,6 @@
  * 종목 상세 페이지(/stocks/[code])의 하단 탭 컨테이너입니다.
  * 기본 활성 탭은 '토론방' — 사용자가 종목에 들어왔을 때 가장 자주 보는 영역.
  *
- * 미구현 탭(시세/뉴스/공시/수급현황)은 자리만 잡아 두고 Placeholder를 렌더링합니다.
  * roomId가 없으면 토론방 탭은 안내 문구만 표시합니다 (공식 토론방 미생성 종목).
  */
 
@@ -14,6 +13,10 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import DiscussionSection from '@/components/discussion/DiscussionSection';
 import CompanyInfoSection from '@/components/stock/CompanyInfoSection';
+import DisclosureSection from '@/components/stock/DisclosureSection';
+import FlowSection from '@/components/stock/FlowSection';
+import NewsSection from '@/components/stock/NewsSection';
+import QuoteSection from '@/components/stock/QuoteSection';
 
 type TabId = 'info' | 'quote' | 'discussion' | 'news' | 'disclosure' | 'flow';
 
@@ -65,8 +68,14 @@ export default function StockDetailTabs({ stockCode, roomId }: Props) {
           ) : (
             <Placeholder text="공식 토론방이 없습니다." />
           )
+        ) : active === 'quote' ? (
+          <QuoteSection stockCode={stockCode} />
+        ) : active === 'news' ? (
+          <NewsSection stockCode={stockCode} />
+        ) : active === 'disclosure' ? (
+          <DisclosureSection stockCode={stockCode} />
         ) : (
-          <Placeholder text="준비 중입니다." />
+          <FlowSection stockCode={stockCode} />
         )}
       </div>
     </section>
