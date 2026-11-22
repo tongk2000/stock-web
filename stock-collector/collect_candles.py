@@ -159,9 +159,13 @@ def run(exchange: str, markets: list[str]):
 def main():
     run(exchange="KRX", markets=["KOSPI", "KOSDAQ"])
     run(exchange="NXT", markets=["KOSPI", "KOSDAQ"])  # NXT도 동일 종목코드 사용
-    # 랭킹 materialized view(v_daily_change, v_52w_extremes) 갱신
-    supabase.rpc("refresh_ranking_views").execute()
-    print("랭킹 뷰 갱신 완료")
+    # 랭킹 materialized view 갱신. 실패해도 일봉은 이미 저장됐으니 경고만 남기고
+    # 같은 워크플로의 재무비율 계산 단계가 계속 돌게 한다
+    try:
+        supabase.rpc("refresh_ranking_views").execute()
+        print("랭킹 뷰 갱신 완료")
+    except Exception as e:
+        print(f"::warning::랭킹 뷰 갱신 실패: {e}")
 
 
 if __name__ == "__main__":

@@ -30,7 +30,7 @@
 | 재무 비율 계산, numeric overflow | `calculate_ratios.py`의 `calculate`, `main`, `_utils.py`의 `fit_numeric` | 커밋 `7416fca`. 열 정밀도는 `supabase/migrations/20260413000002_add_financials.sql` |
 | 공매도 daily·retry·backfill | `collect_short_balances.py`의 `run_daily`, `run_retry`, `run_backfill`, `missing_business_days`, `target_date_for_daily` | 모드는 `--mode`, 수동 실행은 워크플로 입력 `mode` |
 | 영업일 계산 | `_utils.py`의 `get_last_business_day`, `prev_business_day`, `recent_business_days` | 주말만 거른다. 공휴일은 모른다 |
-| 랭킹 뷰 갱신 | `collect_candles.py`의 `main` | 함수는 `supabase/migrations/20261122000002_volume_surge_view.sql` |
+| 랭킹 뷰 갱신 | `collect_candles.py`의 `main` | 함수는 `supabase/migrations/20261122000002_volume_surge_view.sql`. 약 36초 걸려 service_role 타임아웃을 5분으로 올렸다(`20261122000004`). 실패해도 경고만 남기고 다음 단계(비율 계산)는 돈다 |
 | 요청 실패·재시도·간격 | `collect_financials.py`의 `get_financial_data`·`main`, `collect_company_info.py`의 `_get_capital`·`collect_dart_capital`, `collect_wisereport.py`의 `fetch_one` | 아래 '지킬 것' |
 | 로컬에서 돌린다 | `requirements.txt`, `_utils.py`의 `get_supabase` | 환경 변수를 `.env`에 두고 `pip install -r stock-collector/requirements.txt` 뒤 `python stock-collector/<스크립트>`. 운영 DB에 쓴다 |
 | 일정·워크플로를 바꾼다 | 위 '이 폴더' 표 | `.github/workflows/collect_*.yml`의 `cron`(UTC), `env:` |
