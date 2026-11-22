@@ -8,10 +8,10 @@ Naver 증권이 쓰는 WiseReport 기업모니터 페이지에서 종목별로 �
   stocks     : face_value(액면가), float_shares(발행주식수 × 유동비율),
                description(기업개요), listing_date(상장일),
                shares_outstanding(발행주식수, pykrx 실패 대비)
-  financials : ev_ebitda (최근 결산 실적, 종목별 최신 분기 행에 기록)
+  financials : ev_ebitda, dividend(현금 DPS) — 최근 결산 실적, 종목별 최신 분기 행에 기록
 
 페이지:
-  c1010001 : 시세정보(액면가, 발행주식수/유동비율), 기업개요, 펀더멘털(EV/EBITDA)
+  c1010001 : 시세정보(액면가, 발행주식수/유동비율), 기업개요, 펀더멘털(EV/EBITDA, 현금DPS)
   c1020001 : 기업개요 상세(상장일)
 
 환경 변수:
@@ -89,14 +89,23 @@ def parse_main(html: str) -> dict:
     if lines:
         result["description"] = " ".join(lines)
 
-    # 펀더멘털 표의 첫 번째 값 = 최근 결산 실적(A), 두 번째 = 컨센서스(E)
-    th = soup.find("th", string=lambda s: s and s.strip() == "EV/EBITDA")
-    td = th.find_next_sibling("td") if th else None
-    ev = fit_numeric(_num(td.get_text(strip=True)) if td else None, 6)  # numeric(8,2)
+    ev = fit_numeric(_fundamental(soup, "EV/EBITDA"), 6)  # numeric(8,2)
     if ev is not None:
         result["ev_ebitda"] = round(ev, 2)
 
+    # pykrx(KRX)가 로그인 필요로 막혀 DPS 를 못 받으므로 최근 결산 현금 DPS 를 여기서 채운다
+    dps = _fundamental(soup, "현금DPS")
+    if dps:
+        result["dividend"] = int(dps)
+
     return result
+
+
+def _fundamental(soup: BeautifulSoup, label: str) -> float | None:
+    """펀더멘털 표의 첫 번째 값 = 최근 결산 실적(A). 두 번째는 컨센서스(E)라 쓰지 않는다."""
+    th = soup.find("th", string=lambda s: s and s.strip() == label)
+    td = th.find_next_sibling("td") if th else None
+    return _num(td.get_text(strip=True)) if td else None
 
 
 def parse_overview(html: str) -> dict:
@@ -127,6 +136,7 @@ def fetch_one(code: str) -> tuple[str, dict]:
 # ──────────────────────────────────────────────────────────────
 
 _STOCK_FIELDS = ("face_value", "float_shares", "description", "listing_date", "shares_outstanding")
+_FINANCIAL_FIELDS = ("ev_ebitda", "dividend")
 
 
 def _latest_quarters() -> dict[str, tuple[int, int]]:
@@ -165,14 +175,17 @@ def main() -> None:
     print(f"[stocks] {len(stock_rows)}개 종목 업데이트")
 
     latest = _latest_quarters()
-    fin_rows = [
-        {"stock_code": code, "year": latest[code][0], "quarter": latest[code][1], "ev_ebitda": d["ev_ebitda"]}
-        for code, d in data.items()
-        if d.get("ev_ebitda") is not None and code in latest
-    ]
+    fin_rows = []
+    for code, d in data.items():
+        if code not in latest:
+            continue
+        values = {f: d[f] for f in _FINANCIAL_FIELDS if d.get(f) is not None}
+        if values:
+            year, quarter = latest[code]
+            fin_rows.append({"stock_code": code, "year": year, "quarter": quarter, **values})
     if fin_rows:
         chunked_upsert(supabase, "financials", fin_rows, on_conflict="stock_code,year,quarter")
-    print(f"[financials] {len(fin_rows)}개 행 ev_ebitda 업데이트")
+    print(f"[financials] {len(fin_rows)}개 행 ev_ebitda·dividend 업데이트")
 
     print("\n완료!")
 

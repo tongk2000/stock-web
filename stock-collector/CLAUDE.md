@@ -11,8 +11,8 @@
 | `collect_candles.py` | `collect_candles.yml`, 평일 16:00 | FinanceDataReader(KRX·NXT 일봉, 상장사 목록) | `stocks`(code·name·market), `candles`, 끝에 RPC `refresh_ranking_views` |
 | `calculate_ratios.py` | 같은 워크플로의 다음 단계 | DB(`candles`, `financials`, `stocks`) | `financials`의 EPS·BPS·PER·PBR·ROE·부채비율·배당수익률·시총 |
 | `collect_financials.py` | `collect_financials.yml`, 월 10:00 | DART OpenAPI(`corpCode.xml`, `fnlttSinglAcnt.json`, 연결재무제표 최근 4분기) | `financials`(매출·이익·`equity`·`total_assets`) |
-| `collect_company_info.py` | `collect_company_info.yml`, 월 09:00 | pykrx(주식수·시총·DPS·외국인지분율), FinanceDataReader(업종·상장일), DART(자본금) | `stocks`, `financials.dividend` |
-| `collect_wisereport.py` | `collect_wisereport.yml`, 월 12:00 | WiseReport 기업모니터(`navercomp.wisereport.co.kr`의 `c1010001`·`c1020001`) | `stocks`(액면가·유동주식수·개요·상장일·발행주식수), `financials.ev_ebitda` |
+| `collect_company_info.py` | `collect_company_info.yml`, 월 09:00 | pykrx(주식수·시총·DPS·외국인지분율 — 2026-11 기준 KRX 로그인 요구로 전부 빈 결과), FinanceDataReader(업종·상장일), DART(자본금) | `stocks`, `financials.dividend` |
+| `collect_wisereport.py` | `collect_wisereport.yml`, 월 12:00 | WiseReport 기업모니터(`navercomp.wisereport.co.kr`의 `c1010001`·`c1020001`) | `stocks`(액면가·유동주식수·개요·상장일·발행주식수), `financials.ev_ebitda`·`dividend`(현금 DPS) |
 | `collect_short_balances.py` | `collect_short_balances.yml`, 평일 18:10(daily)·20:00(retry) | pykrx 공매도 잔고(KRX 공시 T+2 영업일 18:00 이후) | `short_balances` |
 
 환경 변수는 이름만: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`(모든 스크립트), `DART_API_KEY`(`collect_financials.py`는 필수, `collect_company_info.py`는 없으면 자본금만 건너뜀). `_utils.get_supabase`가 `.env`도 읽는다. 워크플로 Python은 3.10, 의존성은 `requirements.txt`(고정 버전 전체 목록).
@@ -63,5 +63,5 @@
 | `collect_company_info.py` | pykrx·FinanceDataReader·DART로 `stocks` 업종·상장일·주식수·외국인지분율·자본금과 `financials.dividend` 갱신 |
 | `collect_financials.py` | DART 연결재무제표 최근 4분기 매출·영업이익·순이익·자본·자산 수집 |
 | `collect_short_balances.py` | pykrx 공매도 잔고를 daily·retry·backfill 모드로 수집 |
-| `collect_wisereport.py` | WiseReport에서 액면가·유동주식수·기업개요·상장일·EV/EBITDA 보강 |
+| `collect_wisereport.py` | WiseReport에서 액면가·유동주식수·기업개요·상장일·EV/EBITDA·현금DPS 보강 |
 | `requirements.txt` | pip 의존성(고정 버전). 워크플로가 캐시 키로도 쓴다 |
