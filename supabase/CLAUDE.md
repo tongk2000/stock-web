@@ -41,6 +41,7 @@
 - **카운트 트리거는 `security definer`.** `posts`에 UPDATE 정책이 없어 일반 트리거는 조용히 거부당해 카운트가 안 올랐다(`migrations/20260417000003_fix_trigger_security.sql`이 고치고 다시 셌다).
 - **랭킹은 머티리얼라이즈드 뷰.** 일반 뷰는 요청마다 `candles` 전체에 window 함수를 돌려 anon `statement_timeout`(주석: 3초)에 걸려 랭킹이 비었다. 갱신하는 곳은 하나다: `collect_candles.py`가 수집 끝에 `refresh_ranking_views()`를 service_role로 부른다(SQL 안 cron·트리거 없음). `candles`를 다른 길로 고쳐도 다음 일봉 수집까지 랭킹은 그대로고, `current_date - 30` 같은 창은 갱신 시점에 굳는다.
 - **머티리얼라이즈드 뷰를 더하려면** `refresh ... concurrently`용 unique index, `refresh_ranking_views` 통째 재정의(본문이 덮어써진다), `anon`·`authenticated`에 `grant select`(RLS·`security_invoker` 없음), 끝에 `notify pgrst, 'reload schema'`. 뷰를 `drop` 하면 의존 뷰와 권한도 다시 만든다. `refresh_ranking_views`는 service_role만 실행한다(웹에서 부르지 않는다).
+- **service_role 타임아웃은 5분.** service_role은 자체 설정이 없어 authenticator의 8초를 물려받았고, `refresh_ranking_views()`(약 36초)가 매번 57014로 실패했다(`20261122000004_service_role_statement_timeout.sql`). 무거운 RPC를 더하면 이 한도 안인지 SQL 편집기에서 `clock_timestamp()`로 재 본다.
 - **PostgREST `max_rows`(1000)** 가 응답을 자른다. 1000행을 넘는 집계는 DB 뷰로 옮긴다(`v_volume_surge`가 이 이유). 수집 쪽은 `_utils.fetch_all`.
 - **`profiles`는 `nickname`·`onboarded`만 본인이 고칠 수 있다**(`migrations/20261122000003_tighten_memo_and_profile_rls.sql`, 2026-11-22). 그 전에는 `profiles_update`가 본인 행의 모든 열을 허용했고 `revoke update (is_admin)`은 테이블 단위 UPDATE 권한이 남아 있어 효과가 없었다(`is_premium`·`score`·`is_admin`을 본인이 바꿀 수 있었다). 열 하나만 `revoke` 해서는 막히지 않는다: 테이블 단위 권한을 거두고 허용할 열만 `grant` 한다. 사용자가 고칠 열을 더하면 `grant update (열)`도 더한다(빠뜨리면 그 update가 권한 오류로 실패한다).
 - **`chart_memos`는 본인 행만 읽고 쓴다**(`migrations/20261122000003_tighten_memo_and_profile_rls.sql`, 2026-11-22). 2026-04-15의 프로토타입 정책(전부 `true`, 비로그인도 남의 메모를 고칠 수 있었다)과 `unique (stock_code, date)`(같은 종목·날짜에 두 번째 사용자의 저장이 막혔다)를 없앴다. `user_id`의 NULL 허용과 FK 없음은 그대로다(프로토타입 때의 NULL 행이 있을 수 있어 되돌리지 않았다. 원격의 행은 확인 못 함). 남의 메모를 보여 주는 기능을 만들려면 select 정책부터 바꿔야 한다.
@@ -75,3 +76,4 @@
 | `20261122000001_ranking_materialized_views.sql` | `v_daily_change`·`v_52w_extremes` 머티리얼라이즈드 전환, 의존 뷰 재생성, `refresh_ranking_views()`, 날짜 인덱스 |
 | `20261122000002_volume_surge_view.sql` | `v_volume_surge`(직전 20영업일 평균 대비 거래량), 갱신 함수에 추가 |
 | `20261122000003_tighten_memo_and_profile_rls.sql` | `chart_memos` 정책을 본인 행만으로, `unique (stock_code, date)` 제거. `profiles` update를 `nickname`·`onboarded` 열로 제한 |
+| `20261122000004_service_role_statement_timeout.sql` | `service_role`의 `statement_timeout`을 5분으로(authenticator의 8초를 물려받아 `refresh_ranking_views()`가 실패하던 문제) |
