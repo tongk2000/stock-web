@@ -18,7 +18,7 @@ jobs:
       - name: Supabase CLI 설치
         uses: supabase/setup-cli@v1
         with:
-          version: latest
+          version: 3.2.0
 
       - name: 마이그레이션 적용
         env:
@@ -38,4 +38,4 @@ jobs:
           test -n "$PROJECT_REF" || (echo "Missing required secret: SUPABASE_PROJECT_REF or SUPABASE_URL" && exit 1)
 
           supabase link --project-ref "$PROJECT_REF"
-          supabase db push
+          supabase db push --remote
