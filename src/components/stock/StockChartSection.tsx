@@ -381,12 +381,16 @@ export default function StockChartSection({ code }: Props) {
                       exchange === ex && !isNxt
                         ? 'bg-accent text-foreground font-semibold shadow-sm ring-1 ring-border/50'
                         : isNxt
-                          ? 'cursor-not-allowed text-muted-foreground/40'
+                          ? 'cursor-not-allowed text-muted-foreground/60'
                           : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground',
                     )}
                   >
                     {ex}
-                    {isNxt && <span className="ml-1.5 text-xs opacity-50">준비 중</span>}
+                    {isNxt && (
+                      <span className="ml-1.5 rounded bg-muted px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        준비 중
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -542,7 +546,7 @@ export default function StockChartSection({ code }: Props) {
                 <button
                   type="button"
                   onClick={saveMemo}
-                  className="rounded-xl bg-blue-500/20 px-5 py-2.5 text-sm font-semibold text-blue-400 ring-1 ring-blue-500/30 active:bg-blue-500/30"
+                  className="rounded-xl bg-blue-500/20 px-5 py-2.5 text-sm font-semibold text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/30 active:bg-blue-500/30"
                 >
                   저장
                 </button>

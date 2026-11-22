@@ -307,7 +307,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
           <button
             onClick={handleSubmit}
             disabled={user ? (!content.trim() || submitting) : false}
-            className="rounded-lg bg-blue-500/20 px-4 py-1.5 text-sm font-medium text-blue-400 ring-1 ring-blue-500/30 transition-colors hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-500/20 px-4 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/30 transition-colors hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {user ? (submitting ? '등록 중...' : '등록') : '로그인'}
           </button>
@@ -379,7 +379,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
                   className={cn(
                     'flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium transition-colors',
                     dislikedSet.has(post.id)
-                      ? 'bg-blue-500/15 text-blue-400 ring-1 ring-blue-500/30'
+                      ? 'bg-blue-500/15 text-blue-600 dark:text-blue-400 ring-1 ring-blue-500/30'
                       : isMyPost
                         ? 'cursor-not-allowed text-muted-foreground/40'
                         : 'text-muted-foreground hover:bg-accent hover:text-foreground disabled:cursor-default',

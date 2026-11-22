@@ -9,7 +9,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import DiscussionSection from '@/components/discussion/DiscussionSection';
 import CompanyInfoSection from '@/components/stock/CompanyInfoSection';
@@ -36,18 +36,35 @@ interface Props {
 
 export default function StockDetailTabs({ stockCode, roomId }: Props) {
   const [active, setActive] = useState<TabId>('discussion');
+  // 좁은 화면에서 탭이 넘치면 오른쪽에 흐림을 깔아 더 있다는 것을 보인다
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [moreRight, setMoreRight] = useState(false);
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => setMoreRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 1);
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    window.addEventListener('resize', update);
+    return () => {
+      el.removeEventListener('scroll', update);
+      window.removeEventListener('resize', update);
+    };
+  }, []);
 
   return (
     <section className="mt-6">
-      <div className="border-b border-border">
-        <div className="-mb-px flex gap-1 overflow-x-auto scrollbar-none">
+      <div className="relative border-b border-border">
+        <div ref={scrollerRef} className="-mb-px flex overflow-x-auto scrollbar-none sm:gap-1">
           {TABS.map((tab) => (
             <button
               key={tab.id}
               type="button"
               onClick={() => setActive(tab.id)}
               className={cn(
-                'shrink-0 border-b-2 px-3 py-2 text-sm font-medium transition-colors',
+                // 모바일은 칸을 고르게 나눠 390px 폭에 여섯 탭이 다 들어가게 한다
+                'flex-1 shrink-0 whitespace-nowrap border-b-2 px-2 py-2 text-sm font-medium transition-colors sm:flex-none sm:px-3',
                 active === tab.id
                   ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground',
@@ -57,6 +74,12 @@ export default function StockDetailTabs({ stockCode, roomId }: Props) {
             </button>
           ))}
         </div>
+        {moreRight && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 right-0 w-10 bg-gradient-to-l from-background to-transparent"
+          />
+        )}
       </div>
 
       <div className="mt-4">
