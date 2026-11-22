@@ -78,11 +78,14 @@ def get_financial_data(corp_code: str, year: int, quarter: int):
     return data.get("list", [])
 
 
-def extract_amount(items: list, account_names: list):
-    """계정과목명 목록 중 첫 매칭 항목의 당기 금액(thstrm_amount)을 정수로 반환"""
+NET_INCOME_NAMES = ["당기순이익", "당기순이익(손실)"]
+
+
+def extract_amount(items: list, account_names: list, field: str = "thstrm_amount"):
+    """계정과목명 목록 중 첫 매칭 항목의 금액(기본: 당기 금액 thstrm_amount)을 정수로 반환"""
     for item in items:
         if item.get("account_nm") in account_names:
-            val = item.get("thstrm_amount", "").replace(",", "").strip()
+            val = (item.get(field) or "").replace(",", "").strip()
             try:
                 return int(val)
             except (ValueError, TypeError):
@@ -94,7 +97,7 @@ def parse_financials(stock_code: str, year: int, quarter: int, items: list):
     """재무제표 raw 항목에서 손익·재무상태표 항목을 추출하여 dict로 반환"""
     revenue = extract_amount(items, ["매출액", "수익(매출액)"])
     operating_profit = extract_amount(items, ["영업이익", "영업이익(손실)"])
-    net_income = extract_amount(items, ["당기순이익", "당기순이익(손실)"])
+    net_income = extract_amount(items, NET_INCOME_NAMES)
     equity = extract_amount(items, ["자본총계"])
     total_assets = extract_amount(items, ["자산총계"])
 
@@ -113,6 +116,41 @@ def parse_financials(stock_code: str, year: int, quarter: int, items: list):
         "equity": equity,
         "total_assets": total_assets,
     }
+
+
+def net_income_ytd(items: list, quarter: int) -> tuple[int | None, int | None]:
+    """분기·반기 보고서의 (당기 누적, 전기 같은 기간 누적) 당기순이익.
+
+    Q1~Q3 보고서의 thstrm_amount 는 3개월치, Q4(사업보고서)는 연간치라 최신 행 하나로
+    PER·ROE 를 내면 분기 실적으로 계산된다. 누적값은 TTM 계산에 쓴다.
+    Q1 은 누적 = 3개월이라 누적 필드가 비어 있으면 당기/전기 금액으로 대신한다.
+    """
+    ytd = extract_amount(items, NET_INCOME_NAMES, "thstrm_add_amount")
+    prev_ytd = extract_amount(items, NET_INCOME_NAMES, "frmtrm_add_amount")
+    if quarter == 1:
+        ytd = ytd if ytd is not None else extract_amount(items, NET_INCOME_NAMES, "thstrm_amount")
+        prev_ytd = prev_ytd if prev_ytd is not None else extract_amount(items, NET_INCOME_NAMES, "frmtrm_amount")
+    return ytd, prev_ytd
+
+
+def trailing_net_income(rows: list[dict], ytd: dict[tuple[int, int], tuple]) -> int | None:
+    """rows(최신 분기부터)의 첫 행 기준 최근 4분기(TTM) 당기순이익.
+
+    최신이 Q4 면 연간치 그대로, 아니면 전년 연간 + 올해 누적 − 전년 같은 기간 누적.
+    전년 사업보고서가 없거나 누적값이 비면 None (분기치로 대신 계산하지 않는다).
+    """
+    latest = rows[0]
+    year, quarter = latest["year"], latest["quarter"]
+    if quarter == 4:
+        return latest["net_income"]
+    annual = next(
+        (r["net_income"] for r in rows if r["year"] == year - 1 and r["quarter"] == 4),
+        None,
+    )
+    cur_ytd, prev_ytd = ytd.get((year, quarter), (None, None))
+    if annual is None or cur_ytd is None or prev_ytd is None:
+        return None
+    return annual + cur_ytd - prev_ytd
 
 
 def get_target_quarters():
@@ -151,14 +189,19 @@ def main():
         print(f"[{i}/{total}] {name}({stock_code})")
 
         rows = []
+        ytd: dict[tuple[int, int], tuple] = {}
         for year, quarter in targets:
             items = get_financial_data(corp_code, year, quarter)
             if items:
-                row = parse_financials(stock_code, year, quarter, items)
-                rows.append(row)
+                rows.append(parse_financials(stock_code, year, quarter, items))
+                ytd[(year, quarter)] = net_income_ytd(items, quarter)
             time.sleep(0.2)  # API 요청 제한 방지
 
         if rows:
+            # 모든 행이 같은 키를 갖게 한다(빠진 키는 NULL 로 덮인다). TTM 은 최신 행에만 의미가 있다
+            ttm = fit_numeric(trailing_net_income(rows, ytd), 18)  # bigint
+            for idx, row in enumerate(rows):
+                row["net_income_ttm"] = ttm if idx == 0 else None
             supabase.table("financials").upsert(
                 rows, on_conflict="stock_code,year,quarter"
             ).execute()

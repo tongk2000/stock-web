@@ -4,12 +4,12 @@
 collect_candles.py 실행 직후 최신 종가를 기준으로 아래 지표를 계산하여
 financials 테이블 종목별 최신 분기 행에 upsert합니다.
 
-  EPS          = 당기순이익 / 상장주식수
+  EPS          = 당기순이익(최근 4분기, TTM) / 상장주식수
   BPS          = 자본총계   / 상장주식수
   market_cap   = 종가 × 상장주식수
-  PER          = 시가총액   / 당기순이익
+  PER          = 시가총액   / 당기순이익(TTM)
   PBR          = 시가총액   / 자본총계
-  ROE          = 당기순이익 / 자본총계 × 100
+  ROE          = 당기순이익(TTM) / 자본총계 × 100
   debt_ratio   = (자산총계 - 자본총계) / 자본총계 × 100
   dividend_yield = 배당금(DPS) / 종가 × 100
 
@@ -39,7 +39,7 @@ def fetch_latest_financials() -> dict[str, dict]:
     """종목별 최신 (year, quarter) 재무 데이터. {stock_code: row}"""
     latest: dict[str, dict] = {}
     for row in fetch_all(
-        supabase, "financials", "stock_code, year, quarter, net_income, equity, total_assets, dividend"
+        supabase, "financials", "stock_code, year, quarter, net_income, net_income_ttm, equity, total_assets, dividend"
     ):
         code = row["stock_code"]
         yq = (row["year"], row["quarter"])
@@ -119,7 +119,11 @@ def main() -> None:
         ratios = calculate(
             close=prices.get(code),
             shares=shares_map.get(code),
-            net_income=fin.get("net_income"),
+            # 분기 행의 net_income 은 3개월치라 PER·EPS·ROE 에는 최근 4분기 합(TTM)을 쓴다.
+            # TTM 이 없으면(전년 사업보고서 누락 등) Q4(연간) 행일 때만 그 값을 쓴다
+            net_income=fin.get("net_income_ttm")
+            if fin.get("net_income_ttm") is not None
+            else (fin.get("net_income") if fin["quarter"] == 4 else None),
             equity=fin.get("equity"),
             total_assets=fin.get("total_assets"),
             dividend=fin.get("dividend"),

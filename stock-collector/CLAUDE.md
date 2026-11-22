@@ -26,7 +26,7 @@
 | WiseReport 항목을 더하거나 파싱이 깨졌다 | `collect_wisereport.py`의 `parse_main`, `parse_overview`, `_STOCK_FIELDS`, `fetch_one` | 페이지 마크업이 바뀌면 `_row_value`가 먼저 깨진다 |
 | upsert가 NOT NULL·FK로 실패한다 | `_utils.py`의 `fetch_stock_keys`, `fetch_stock_codes` | 커밋 `0ff0d0a`, `38deac5`, `ee1ac93` |
 | 배치 크기, 1000행 제한 | `_utils.py`의 `chunked_upsert`(chunk 500), `fetch_all`(page 1000) | `chunked_upsert`는 키 조합이 같은 행끼리 묶어 보낸다 |
-| 재무 분기 선택, DART 계정·보고서 코드 | `collect_financials.py`의 `get_target_quarters`, `parse_financials`, `extract_amount`, `REPRT_CODE_MAP` | |
+| 재무 분기 선택, DART 계정·보고서 코드, TTM | `collect_financials.py`의 `get_target_quarters`, `parse_financials`, `extract_amount`, `net_income_ytd`, `trailing_net_income`, `REPRT_CODE_MAP` | |
 | 재무 비율 계산, numeric overflow | `calculate_ratios.py`의 `calculate`, `main`, `_utils.py`의 `fit_numeric` | 커밋 `7416fca`. 열 정밀도는 `supabase/migrations/20260413000002_add_financials.sql` |
 | 공매도 daily·retry·backfill | `collect_short_balances.py`의 `run_daily`, `run_retry`, `run_backfill`, `missing_business_days`, `target_date_for_daily` | 모드는 `--mode`, 수동 실행은 워크플로 입력 `mode` |
 | 영업일 계산 | `_utils.py`의 `get_last_business_day`, `prev_business_day`, `recent_business_days` | 주말만 거른다. 공휴일은 모른다 |
@@ -48,7 +48,7 @@
 - **자체 재시도는 공매도에만 있다.** `retry` 모드가 최근 5영업일 중 행이 0건인 날을 다시 받는다. 다른 스크립트는 실패한 종목을 건너뛰고(빈 결과) 다음 실행을 기다린다.
 - **Python 3.10 문법만.** 워크플로가 3.10이다. `X | None`은 되지만 `tomllib`·`ExceptionGroup`·`typing.Self` 같은 3.11+ 기능은 쓰지 않는다.
 - **날짜는 러너의 UTC 시계다.** `datetime.now()`를 그대로 쓴다. 평일 16:00·18:10 KST는 UTC도 같은 날이라 맞지만, 월요일 09:00 KST(UTC 00:00) 실행은 "오늘"이 월요일이라 기준일이 아직 장이 열리지 않은 날이다. `collect_company_info.py`의 pykrx가 그날 데이터를 주는지 확인 못 함.
-- **재무 수치의 의미.** `collect_financials.py`는 분기마다 보고서(Q4는 사업보고서)의 `thstrm_amount`를 그대로 저장한다. Q4는 연간 값이고 Q1~Q3는 분기 값일 수 있어, 최신 분기 행으로 계산하는 PER·ROE가 분기마다 다른 뜻이 될 수 있다(DART 응답 확인 못 함).
+- **재무 수치의 의미.** `collect_financials.py`는 분기마다 보고서의 `thstrm_amount`를 저장한다. Q1~Q3는 3개월치, Q4(사업보고서)는 연간치다(2026-11-22 삼성전자 저장값으로 확인: 2026 분기 매출 134·171·195조, 2025 Q4 334조). 그래서 PER·EPS·ROE는 `net_income`이 아니라 `net_income_ttm`(최신 행에만, `trailing_net_income`: 전년 연간 + 올해 누적 − 전년 같은 기간 누적)으로 계산한다. 분기 행 하나로 계산했을 때 펄어비스 PER이 162(네이버 6.6)로 나왔다. TTM을 못 구하면 Q4 행일 때만 연간치를 쓰고 아니면 비운다.
 - **비밀값은 이름만 쓴다.** 키를 코드·로그·문서에 적지 않는다.
 
 ## 파일
