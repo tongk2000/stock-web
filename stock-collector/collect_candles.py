@@ -159,6 +159,9 @@ def run(exchange: str, markets: list[str]):
 def main():
     run(exchange="KRX", markets=["KOSPI", "KOSDAQ"])
     run(exchange="NXT", markets=["KOSPI", "KOSDAQ"])  # NXT도 동일 종목코드 사용
+    # 랭킹 materialized view(v_daily_change, v_52w_extremes) 갱신
+    supabase.rpc("refresh_ranking_views").execute()
+    print("랭킹 뷰 갱신 완료")
 
 
 if __name__ == "__main__":
