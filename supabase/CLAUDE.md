@@ -77,3 +77,4 @@
 | `20261122000002_volume_surge_view.sql` | `v_volume_surge`(직전 20영업일 평균 대비 거래량), 갱신 함수에 추가 |
 | `20261122000003_tighten_memo_and_profile_rls.sql` | `chart_memos` 정책을 본인 행만으로, `unique (stock_code, date)` 제거. `profiles` update를 `nickname`·`onboarded` 열로 제한 |
 | `20261122000004_service_role_statement_timeout.sql` | `service_role`의 `statement_timeout`을 5분으로(authenticator의 8초를 물려받아 `refresh_ranking_views()`가 실패하던 문제) |
+| `20261122000005_financials_net_income_ttm.sql` | `financials.net_income_ttm`(최근 4분기 당기순이익). 분기 행의 `net_income`은 3개월치라 PER·EPS·ROE는 이 값으로 계산 |
