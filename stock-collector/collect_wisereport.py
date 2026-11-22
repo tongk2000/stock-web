@@ -26,7 +26,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import requests
 from bs4 import BeautifulSoup
 
-from _utils import chunked_upsert, fetch_all, fetch_stock_codes, fit_numeric, get_supabase
+from _utils import chunked_upsert, fetch_all, fetch_stock_names, fit_numeric, get_supabase
 
 supabase = get_supabase()
 
@@ -138,7 +138,8 @@ def _latest_quarters() -> dict[str, tuple[int, int]]:
 
 def main() -> None:
     print("=== WiseReport 기업 개요 보강 시작 ===")
-    codes = sorted(fetch_stock_codes(supabase))
+    names = fetch_stock_names(supabase)
+    codes = sorted(names)
     print(f"대상 종목 {len(codes)}개")
 
     data: dict[str, dict] = {}
@@ -154,8 +155,8 @@ def main() -> None:
 
     stock_rows = []
     for code, d in data.items():
-        row = {"code": code, **{f: d[f] for f in _STOCK_FIELDS if d.get(f) is not None}}
-        if len(row) > 1:
+        row = {"code": code, "name": names[code], **{f: d[f] for f in _STOCK_FIELDS if d.get(f) is not None}}
+        if len(row) > 2:
             stock_rows.append(row)
     if stock_rows:
         chunked_upsert(supabase, "stocks", stock_rows, on_conflict="code")

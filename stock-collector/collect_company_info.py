@@ -30,7 +30,7 @@ import FinanceDataReader as fdr
 import requests
 from pykrx import stock
 
-from _utils import chunked_upsert, fetch_all, fetch_stock_codes, get_last_business_day, get_supabase
+from _utils import chunked_upsert, fetch_all, fetch_stock_names, get_last_business_day, get_supabase
 
 supabase = get_supabase()
 
@@ -263,11 +263,12 @@ def run_stocks_update(
     listing_data: dict[str, dict],
     dart_capital: dict[str, int],
 ) -> None:
-    # stocks 에 없는 코드를 upsert 하면 name NOT NULL 위반으로 전체가 실패하므로 기존 종목만 갱신
-    all_codes = (set(pykrx_data) | set(listing_data) | set(dart_capital)) & fetch_stock_codes(supabase)
+    # stocks upsert 는 name NOT NULL 을 먼저 검사하므로 기존 종목만, name 을 포함해 갱신
+    names = fetch_stock_names(supabase)
+    all_codes = (set(pykrx_data) | set(listing_data) | set(dart_capital)) & set(names)
     rows = []
     for code in all_codes:
-        row: dict = {"code": code}
+        row: dict = {"code": code, "name": names[code]}
         pd_ = pykrx_data.get(code, {})
         ld = listing_data.get(code, {})
 
@@ -281,7 +282,7 @@ def run_stocks_update(
         if code in dart_capital:
             row["capital"] = dart_capital[code]
 
-        if len(row) > 1:
+        if len(row) > 2:
             rows.append(row)
 
     if rows:

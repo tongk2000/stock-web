@@ -69,6 +69,12 @@ def fetch_stock_codes(supabase: Client) -> set[str]:
     return {row["code"] for row in fetch_all(supabase, "stocks", "code")}
 
 
+def fetch_stock_names(supabase: Client) -> dict[str, str]:
+    """{code: name}. stocks upsert 는 INSERT 단계에서 name NOT NULL 을 먼저 검사하므로
+    기존 종목을 갱신할 때도 name 을 함께 보내야 한다."""
+    return {row["code"]: row["name"] for row in fetch_all(supabase, "stocks", "code, name")}
+
+
 def fit_numeric(val: float | None, int_digits: int) -> float | None:
     """numeric(p, s) 컬럼 범위(정수부 int_digits 자리)를 넘는 값은 None.
 
