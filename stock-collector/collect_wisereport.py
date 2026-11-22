@@ -93,10 +93,11 @@ def parse_main(html: str) -> dict:
     if ev is not None:
         result["ev_ebitda"] = round(ev, 2)
 
-    # pykrx(KRX)가 로그인 필요로 막혀 DPS 를 못 받으므로 최근 결산 현금 DPS 를 여기서 채운다
-    dps = _fundamental(soup, "현금DPS")
-    if dps:
-        result["dividend"] = int(dps)
+    # pykrx(KRX)가 로그인 필요로 막혀 DPS 를 못 받으므로 최근 결산 현금 DPS 를 여기서 채운다.
+    # 행은 있는데 값이 비어 있으면("원"만) 배당을 하지 않은 것이라 0 으로 둔다 — 화면에서
+    # '모름(-)'과 '무배당(0원)'을 구분하기 위해서다. 행 자체가 없으면 건드리지 않는다
+    if soup.find("th", string=lambda s: s and s.strip() == "현금DPS"):
+        result["dividend"] = int(_fundamental(soup, "현금DPS") or 0)
 
     return result
 

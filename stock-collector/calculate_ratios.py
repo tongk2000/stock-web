@@ -80,7 +80,8 @@ def calculate(
     if total_assets is not None and equity and equity > 0:
         debt_ratio = _round2((total_assets - equity) / equity * 100)
 
-    dividend_yield = _round2(dividend / close * 100) if dividend and close else None
+    # 무배당(0)도 0% 로 저장해 '모름'과 구분한다
+    dividend_yield = _round2(dividend / close * 100) if dividend is not None and close else None
 
     return {
         "market_cap": market_cap,
