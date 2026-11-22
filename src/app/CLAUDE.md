@@ -54,7 +54,7 @@ App Router의 라우트다. 페이지(`page.tsx`)는 서버 컴포넌트가 기�
 | --- | --- |
 | `favicon.ico` | 사이트 아이콘(App Router 규약으로 자동 연결) |
 | `globals.css` | Tailwind v4 진입, 라이트·다크 색 토큰(`:root`, `.dark`), `@custom-variant dark`, iOS 입력 줌 방지, 차트 패널 구분선 |
-| `layout.tsx` | 루트 레이아웃(서버). Geist 폰트, 기본 `metadata`, 테마 FOUC 스크립트, Provider 중첩, `AppHeader`·`LeftNav`·`BottomBar` 배치 |
+| `layout.tsx` | 루트 레이아웃(서버). `lang="ko"`, Geist 폰트(라틴)와 Pretendard CDN 스타일시트(한글, 글꼴 순서는 `globals.css`의 `--font-sans`), 기본 `metadata`, 테마 FOUC 스크립트, Provider 중첩, `AppHeader`·`LeftNav`·`BottomBar` 배치 |
 | `page.tsx` | 홈(서버). `FavoriteStockPrices`·`FavoriteDiscussionFeed`를 그리고 직접 읽는 데이터는 없다 |
 | `robots.ts` | `/robots.txt`. 전체 허용, `/auth/` 차단, sitemap 주소는 `NEXT_PUBLIC_SITE_URL` |
 | `sitemap.ts` | `/sitemap.xml`. 홈·토론 목록·stocks 전체·참여도(`ENGAGEMENT_THRESHOLD`) 넘는 posts(`LIMITS.SITEMAP_MAX_POSTS`까지) |
