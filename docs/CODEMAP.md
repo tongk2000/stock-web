@@ -45,7 +45,7 @@ GitHub Actions. 모두 수동 실행(`workflow_dispatch`)도 된다. secret은 �
 
 | 파일 | 무엇을 돌리나, 언제, 어떤 secret |
 | --- | --- |
-| `apply_migrations.yml` | `supabase/migrations/**`가 바뀐 `main` push에서 돈다. Supabase CLI 3.2.0 고정 설치 → `supabase link` → `supabase db push --remote`. secret: `SUPABASE_ACCESS_TOKEN`(없으면 실패), `SUPABASE_PROJECT_REF`, `SUPABASE_URL`(ref가 없을 때 URL에서 뽑는다) |
+| `apply_migrations.yml` | `supabase/migrations/**`가 바뀐 `main` push에서 돈다. Supabase CLI 3.2.0 고정 설치 → `supabase link` → `supabase db push --remote --yes`. secret: `SUPABASE_ACCESS_TOKEN`(없으면 실패), `SUPABASE_PROJECT_REF`, `SUPABASE_URL`(ref가 없을 때 URL에서 뽑는다) |
 | `collect_candles.yml` | 평일 16:00 KST(`0 7 * * 1-5`). `collect_candles.py` 다음 `calculate_ratios.py`. Python 3.10. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY` |
 | `collect_company_info.yml` | 매주 월 09:00 KST(`0 0 * * 1`). `collect_company_info.py`. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY` |
 | `collect_financials.yml` | 매주 월 10:00 KST(`0 1 * * 1`). `collect_financials.py`. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY` |

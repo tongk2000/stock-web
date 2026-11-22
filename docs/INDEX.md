@@ -139,7 +139,7 @@
 | `.github/workflows/collect_financials.yml`(재무 정보 수집) | `stock-collector/collect_financials.py`(최근 4분기 연결재무제표) | 월요일 10:00(`0 1 * * 1`) + 수동 | DART `opendart.fss.or.kr`(`corpCode.xml`, `fnlttSinglAcnt.json`) | `financials`(매출·영업이익·순이익·영업이익률·`equity`·`total_assets`) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY`(이 스크립트는 필수) |
 | `.github/workflows/collect_wisereport.yml`(기업 개요 보강) | `stock-collector/collect_wisereport.py` | 월요일 12:00(`0 3 * * 1`) + 수동 | WiseReport `navercomp.wisereport.co.kr` | `stocks`(`face_value`, `float_shares`, `description`, `listing_date`, `shares_outstanding`), `financials`(`ev_ebitda`) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | `.github/workflows/collect_short_balances.yml`(공매도 잔고 수집) | `stock-collector/collect_short_balances.py --mode daily/retry/backfill` | 평일 18:10 daily(T-2 영업일 1일치), 평일 20:00 retry(최근 5영업일 중 빈 날짜), 수동 실행 때 모드 선택(backfill은 최근 365일) | pykrx(KRX 공매도 잔고) | `short_balances` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
-| `.github/workflows/apply_migrations.yml`(Supabase 마이그레이션 적용) | 스크립트 없음. Supabase CLI 3.2.0으로 `supabase link` 후 `supabase db push --remote` | `main`에 `supabase/migrations/**` 변경이 push될 때 + 수동 | Supabase 관리 API | 운영 DB 스키마 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`(없으면 `SUPABASE_URL`에서 프로젝트 ref를 뽑는다) |
+| `.github/workflows/apply_migrations.yml`(Supabase 마이그레이션 적용) | 스크립트 없음. Supabase CLI 3.2.0으로 `supabase link` 후 `supabase db push --remote --yes` | `main`에 `supabase/migrations/**` 변경이 push될 때 + 수동 | Supabase 관리 API | 운영 DB 스키마 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`(없으면 `SUPABASE_URL`에서 프로젝트 ref를 뽑는다) |
 
 ## 설정값
 

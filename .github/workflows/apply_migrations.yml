@@ -38,4 +38,5 @@ jobs:
           test -n "$PROJECT_REF" || (echo "Missing required secret: SUPABASE_PROJECT_REF or SUPABASE_URL" && exit 1)
 
           supabase link --project-ref "$PROJECT_REF"
-          supabase db push --remote
+          # --yes: CI 는 터미널이 아니라 확인 질문에 답할 수 없다. 없으면 적용할 것이 있을 때 실패한다.
+          supabase db push --remote --yes

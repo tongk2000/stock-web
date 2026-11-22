@@ -34,6 +34,7 @@ holdem에서 옮기며 사용자에게 따로 확인받지 않은 것(에이전�
 | --- | --- | --- |
 | 2026-11-22 | Vercel(Hobby)은 커밋 작성자 이메일이 GitHub 계정과 맞지 않으면 운영 배포를 막는다. 이 맥의 전역 git 이메일은 회사 주소라 push 일곱 번이 연달아 'Blocked'였고 사이트는 옛 빌드에 머물렀다. 저장소 로컬 설정(`git config user.email`/`user.name`)을 GitHub 계정(tongk2000)으로 맞췄다(커밋 `7e16ab7`). | push 전에 `git config user.email`을 본다. push 뒤 `gh api repos/tongk2000/stock-web/deployments`의 상태가 `success`인지 본다. 다른 머신에서 받으면 로컬 설정부터 한다 |
 | 2026-11-22 | `apply_migrations.yml`이 2026-05쯤부터 깨져 있었다(`SUPABASE_ACCESS_TOKEN` secret 없음 → Supabase CLI v3가 `config.toml`의 `[inbucket]`을 거부하고 `db push`가 로컬 DB를 기본으로 삼음). secret 추가, `[local_smtp]`, CLI 3.2.0 고정과 `supabase db push --remote`로 고쳤다(커밋 `7969b0f`, `aea9368`). 반년 동안 손으로 적용해 이력이 어긋났고 원격에만 있던 마이그레이션을 되살렸다(`6acd654`). | 새 마이그레이션은 워크플로로 적용한다. 자세한 것은 [supabase 안내](../supabase/CLAUDE.md)의 '지킬 것' |
+| 2026-11-22 | 같은 날 고친 `apply_migrations.yml`이 실제로 적용할 마이그레이션이 생기자 다시 실패했다: `supabase db push --remote`가 확인을 묻는데 CI는 답할 수 없다("Re-run with --yes", 아무것도 바뀌지 않음). `--yes`를 붙였다. | 워크플로를 고친 뒤에는 적용할 마이그레이션이 있는 실행으로 확인한다. push 뒤 `gh run list --workflow apply_migrations.yml`로 결과를 본다 |
 
 ## 계획
 

@@ -34,7 +34,7 @@
 ## 지킬 것
 
 - **스키마는 새 파일로만 바꾼다.** 커밋된 마이그레이션은 고치지 않는다(원격 이력과 어긋난다). 이름은 `YYYYMMDDNNNNNN_설명.sql`(날짜 8자리 + 같은 날 순번 6자리). 접두가 가장 마지막 파일보다 커야 한다(`ls supabase/migrations | tail -1`).
-- **적용 경로.** `.github/workflows/apply_migrations.yml`은 `main`에서 `supabase/migrations/**`가 바뀐 push와 수동 실행에서 돈다. Supabase CLI `3.2.0` 고정 설치 → `supabase link --project-ref` → `supabase db push --remote`. secret: `SUPABASE_ACCESS_TOKEN`(없으면 첫 단계 실패), `SUPABASE_PROJECT_REF`(없으면 `SUPABASE_URL`에서 뽑는다). 합쳐지는 순간 운영 DB에 적용된다.
+- **적용 경로.** `.github/workflows/apply_migrations.yml`은 `main`에서 `supabase/migrations/**`가 바뀐 push와 수동 실행에서 돈다. Supabase CLI `3.2.0` 고정 설치 → `supabase link --project-ref` → `supabase db push --remote --yes`. secret: `SUPABASE_ACCESS_TOKEN`(없으면 첫 단계 실패), `SUPABASE_PROJECT_REF`(없으면 `SUPABASE_URL`에서 뽑는다). 합쳐지는 순간 운영 DB에 적용된다. `--yes`가 없으면 CI는 확인 질문에 답하지 못해 적용할 마이그레이션이 있을 때 실패한다(2026-11-22에 처음 걸렸다. 그날 앞서 고친 워크플로는 적용할 것이 없을 때만 통과했다).
 - **배경(2026-11-22 세션 기록, 커밋 `aea9368`·`7969b0f`·`6acd654`).** 이 워크플로는 2026-05쯤부터 깨져 있었다: `SUPABASE_ACCESS_TOKEN` secret이 없었고, 그 뒤 CLI `latest`(v3)가 `config.toml`의 `[inbucket]`을 거부하고 `db push`가 로컬 DB를 기본으로 삼았다. 11-22에 secret 추가, `[local_smtp]`로 교체, CLI 3.2.0 고정과 `--remote`로 고쳤다. 그 반년은 손으로 적용해 이력이 어긋났고, 원격에만 있던 `20260506000001_add_profile_admin_flag.sql`을 되살렸다.
 - **그래서:** 새 마이그레이션은 워크플로로 적용한다. 실패하면 대시보드 SQL 편집기로 가기 전에 Actions 실행 로그를 먼저 본다. SQL 편집기로 적용했다면 `supabase_migrations.schema_migrations`에 그 버전(접두)을 넣는다.
 - **새 테이블은 RLS를 켜고 정책을 쓴다.** 정책 없는 동작은 막힌다.
