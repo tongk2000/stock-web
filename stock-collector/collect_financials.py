@@ -21,7 +21,7 @@ import time
 import requests
 from datetime import datetime
 
-from _utils import fetch_stock_codes, get_supabase
+from _utils import fetch_stock_codes, fit_numeric, get_supabase
 
 supabase = get_supabase()
 
@@ -100,7 +100,7 @@ def parse_financials(stock_code: str, year: int, quarter: int, items: list):
 
     operating_margin = None
     if revenue and operating_profit and revenue != 0:
-        operating_margin = round(operating_profit / revenue * 100, 2)
+        operating_margin = fit_numeric(round(operating_profit / revenue * 100, 2), 4)  # numeric(6,2)
 
     return {
         "stock_code": stock_code,

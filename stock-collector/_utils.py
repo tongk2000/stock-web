@@ -69,6 +69,17 @@ def fetch_stock_codes(supabase: Client) -> set[str]:
     return {row["code"] for row in fetch_all(supabase, "stocks", "code")}
 
 
+def fit_numeric(val: float | None, int_digits: int) -> float | None:
+    """numeric(p, s) 컬럼 범위(정수부 int_digits 자리)를 넘는 값은 None.
+
+    매출·자본이 아주 작은 종목은 비율이 수만 % 로 튀어 numeric field overflow 로
+    upsert 전체가 실패하므로, 의미 없는 극단값은 저장하지 않는다.
+    """
+    if val is None or abs(val) >= 10 ** int_digits:
+        return None
+    return val
+
+
 def chunked_upsert(
     supabase: Client,
     table: str,

@@ -17,7 +17,7 @@ financials 테이블 종목별 최신 분기 행에 upsert합니다.
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 """
 
-from _utils import chunked_upsert, fetch_all, get_last_business_day, get_supabase
+from _utils import chunked_upsert, fetch_all, fit_numeric, get_last_business_day, get_supabase
 
 supabase = get_supabase()
 
@@ -86,11 +86,12 @@ def calculate(
         "market_cap": market_cap,
         "eps": eps,
         "bps": bps,
-        "per": per,
-        "pbr": pbr,
-        "roe": roe,
-        "debt_ratio": debt_ratio,
-        "dividend_yield": dividend_yield,
+        # 컬럼 정밀도: per·debt_ratio numeric(8,2), pbr·roe·dividend_yield numeric(6,2)
+        "per": fit_numeric(per, 6),
+        "pbr": fit_numeric(pbr, 4),
+        "roe": fit_numeric(roe, 4),
+        "debt_ratio": fit_numeric(debt_ratio, 6),
+        "dividend_yield": fit_numeric(dividend_yield, 4),
     }
 
 
