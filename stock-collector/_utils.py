@@ -69,10 +69,13 @@ def fetch_stock_codes(supabase: Client) -> set[str]:
     return {row["code"] for row in fetch_all(supabase, "stocks", "code")}
 
 
-def fetch_stock_names(supabase: Client) -> dict[str, str]:
-    """{code: name}. stocks upsert 는 INSERT 단계에서 name NOT NULL 을 먼저 검사하므로
-    기존 종목을 갱신할 때도 name 을 함께 보내야 한다."""
-    return {row["code"]: row["name"] for row in fetch_all(supabase, "stocks", "code, name")}
+def fetch_stock_keys(supabase: Client) -> dict[str, dict]:
+    """{code: {"name", "market"}}. stocks upsert 는 INSERT 단계에서 NOT NULL(name, market)을
+    먼저 검사하므로 기존 종목을 갱신할 때도 이 두 값을 함께 보내야 한다."""
+    return {
+        row["code"]: {"name": row["name"], "market": row["market"]}
+        for row in fetch_all(supabase, "stocks", "code, name, market")
+    }
 
 
 def fit_numeric(val: float | None, int_digits: int) -> float | None:
