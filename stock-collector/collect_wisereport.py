@@ -22,6 +22,7 @@ Naver 증권이 쓰는 WiseReport 기업모니터 페이지에서 종목별로 �
 
 import re
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from difflib import SequenceMatcher
 
 import requests
 from bs4 import BeautifulSoup
@@ -78,11 +79,12 @@ def parse_main(html: str) -> dict:
             if ratio:
                 result["float_shares"] = int(shares * ratio / 100)
 
-    # 같은 문장이 중복으로 내려오는 경우가 있어 순서를 유지하며 중복 제거
+    # 표현만 조금 다른 같은 문장이 함께 내려오는 경우가 있어(예: "~하고 있으며" / "~하며")
+    # 순서를 유지하며 앞 문장과 80% 이상 비슷하면 버린다
     lines: list[str] = []
     for li in soup.select("div.cmp_comment li"):
         text = li.get_text(" ", strip=True)
-        if text and text not in lines:
+        if text and all(SequenceMatcher(None, text, kept).ratio() < 0.8 for kept in lines):
             lines.append(text)
     if lines:
         result["description"] = " ".join(lines)
