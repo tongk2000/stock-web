@@ -49,6 +49,26 @@ def recent_business_days(count: int, ref: datetime | None = None) -> list[dateti
     return days
 
 
+def fetch_all(supabase: Client, table: str, columns: str, page: int = 1000, **eq) -> list[dict]:
+    """PostgREST max_rows(1000) 제한을 넘도록 range 페이지네이션으로 전체 행 조회."""
+    rows: list[dict] = []
+    start = 0
+    while True:
+        query = supabase.table(table).select(columns)
+        for col, val in eq.items():
+            query = query.eq(col, val)
+        batch = query.range(start, start + page - 1).execute().data or []
+        rows.extend(batch)
+        if len(batch) < page:
+            return rows
+        start += page
+
+
+def fetch_stock_codes(supabase: Client) -> set[str]:
+    """stocks 테이블에 등록된 종목코드. FK/NOT NULL 위반 방지용 필터."""
+    return {row["code"] for row in fetch_all(supabase, "stocks", "code")}
+
+
 def chunked_upsert(
     supabase: Client,
     table: str,

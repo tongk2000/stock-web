@@ -30,7 +30,7 @@ import FinanceDataReader as fdr
 import requests
 from pykrx import stock
 
-from _utils import chunked_upsert, get_last_business_day, get_supabase
+from _utils import chunked_upsert, fetch_all, fetch_stock_codes, get_last_business_day, get_supabase
 
 supabase = get_supabase()
 
@@ -249,9 +249,8 @@ def collect_dart_capital() -> dict[str, int]:
 
 def _get_latest_quarters() -> dict[str, tuple[int, int]]:
     """financials 테이블에서 종목별 최신 (year, quarter)."""
-    res = supabase.table("financials").select("stock_code, year, quarter").execute()
     latest: dict[str, tuple[int, int]] = {}
-    for row in (res.data or []):
+    for row in fetch_all(supabase, "financials", "stock_code, year, quarter"):
         code = row["stock_code"]
         yq = (row["year"], row["quarter"])
         if code not in latest or yq > latest[code]:
@@ -264,7 +263,8 @@ def run_stocks_update(
     listing_data: dict[str, dict],
     dart_capital: dict[str, int],
 ) -> None:
-    all_codes = set(pykrx_data) | set(listing_data) | set(dart_capital)
+    # stocks 에 없는 코드를 upsert 하면 name NOT NULL 위반으로 전체가 실패하므로 기존 종목만 갱신
+    all_codes = (set(pykrx_data) | set(listing_data) | set(dart_capital)) & fetch_stock_codes(supabase)
     rows = []
     for code in all_codes:
         row: dict = {"code": code}

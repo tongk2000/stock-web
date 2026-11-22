@@ -17,7 +17,7 @@ financials 테이블 종목별 최신 분기 행에 upsert합니다.
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
 """
 
-from _utils import chunked_upsert, get_last_business_day, get_supabase
+from _utils import chunked_upsert, fetch_all, get_last_business_day, get_supabase
 
 supabase = get_supabase()
 
@@ -28,26 +28,19 @@ def _round2(val: float | None) -> float | None:
 
 def fetch_prices(date_str: str) -> dict[str, int]:
     """해당 날짜의 KRX 일봉 종가. {stock_code: close}"""
-    res = (
-        supabase.table("candles")
-        .select("stock_code, close")
-        .eq("exchange", "KRX")
-        .eq("candle_type", "daily")
-        .eq("date", date_str)
-        .execute()
+    rows = fetch_all(
+        supabase, "candles", "stock_code, close",
+        exchange="KRX", candle_type="daily", date=date_str,
     )
-    return {row["stock_code"]: row["close"] for row in (res.data or [])}
+    return {row["stock_code"]: row["close"] for row in rows}
 
 
 def fetch_latest_financials() -> dict[str, dict]:
     """종목별 최신 (year, quarter) 재무 데이터. {stock_code: row}"""
-    res = (
-        supabase.table("financials")
-        .select("stock_code, year, quarter, net_income, equity, total_assets, dividend")
-        .execute()
-    )
     latest: dict[str, dict] = {}
-    for row in (res.data or []):
+    for row in fetch_all(
+        supabase, "financials", "stock_code, year, quarter, net_income, equity, total_assets, dividend"
+    ):
         code = row["stock_code"]
         yq = (row["year"], row["quarter"])
         if code not in latest or yq > (latest[code]["year"], latest[code]["quarter"]):
@@ -57,10 +50,9 @@ def fetch_latest_financials() -> dict[str, dict]:
 
 def fetch_shares() -> dict[str, int]:
     """stocks 테이블에서 상장주식수. {code: shares_outstanding}"""
-    res = supabase.table("stocks").select("code, shares_outstanding").execute()
     return {
         row["code"]: row["shares_outstanding"]
-        for row in (res.data or [])
+        for row in fetch_all(supabase, "stocks", "code, shares_outstanding")
         if row["shares_outstanding"]
     }
 

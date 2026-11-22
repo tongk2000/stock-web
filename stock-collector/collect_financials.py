@@ -20,18 +20,13 @@ import os
 import time
 import requests
 from datetime import datetime
-from dotenv import load_dotenv
-from supabase import create_client
 
-load_dotenv()
+from _utils import fetch_stock_codes, get_supabase
+
+supabase = get_supabase()
 
 DART_API_KEY = os.environ["DART_API_KEY"]
 DART_BASE_URL = "https://opendart.fss.or.kr/api"
-
-supabase = create_client(
-    os.environ["SUPABASE_URL"],
-    os.environ["SUPABASE_SERVICE_ROLE_KEY"],
-)
 
 # 분기 → DART 보고서 코드
 REPRT_CODE_MAP = {1: "11013", 2: "11012", 3: "11014", 4: "11011"}
@@ -44,7 +39,7 @@ def get_corp_list():
     import io
 
     url = f"{DART_BASE_URL}/corpCode.xml"
-    res = requests.get(url, params={"crtfc_key": DART_API_KEY})
+    res = requests.get(url, params={"crtfc_key": DART_API_KEY}, timeout=30)
     z = zipfile.ZipFile(io.BytesIO(res.content))
     xml_data = z.read("CORPCODE.xml")
     root = ET.fromstring(xml_data)
@@ -71,8 +66,11 @@ def get_financial_data(corp_code: str, year: int, quarter: int):
         "reprt_code": REPRT_CODE_MAP[quarter],
         "fs_div": "CFS",  # 연결재무제표
     }
-    res = requests.get(url, params=params)
-    data = res.json()
+    # 타임아웃이 없으면 응답 없는 요청 하나에 잡혀 Actions 6시간 제한으로 취소된다
+    try:
+        data = requests.get(url, params=params, timeout=10).json()
+    except (requests.RequestException, ValueError):
+        return None
 
     if data.get("status") != "000":
         return None
@@ -140,7 +138,9 @@ def main():
     targets = get_target_quarters()
     print(f"수집 대상 분기: {targets}")
 
-    corps = get_corp_list()
+    # stocks 에 없는 종목을 upsert 하면 financials_stock_code_fkey 위반으로 전체가 중단된다
+    known_codes = fetch_stock_codes(supabase)
+    corps = [c for c in get_corp_list() if c["stock_code"] in known_codes]
     print(f"상장사 {len(corps)}개")
 
     total = len(corps)
