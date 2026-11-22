@@ -1,0 +1,25 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 docs/outline.py *)",
+      "Bash(python3 docs/check-index.py)",
+      "Bash(python3 tool/lint-check.py)",
+      "Bash(sh tool/check.sh)",
+      "Bash(sh tool/check.sh build)"
+    ]
+  },
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$CLAUDE_PROJECT_DIR\"/docs/check-index.py --stop-hook",
+            "timeout": 30,
+            "statusMessage": "색인 검사"
+          }
+        ]
+      }
+    ]
+  }
+}
