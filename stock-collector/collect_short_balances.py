@@ -41,9 +41,8 @@ def fetch_rows(yyyymmdd: str) -> list[dict]:
     rows: list[dict] = []
     for market in MARKETS:
         try:
-            df = stock.get_shorting_balance_by_ticker(
-                fromdate=yyyymmdd, todate=yyyymmdd, market=market
-            )
+            # pykrx 1.2.x 시그니처: (date, market) — fromdate/todate 는 TypeError
+            df = stock.get_shorting_balance_by_ticker(yyyymmdd, market=market)
         except Exception as e:
             print(f"  [{yyyymmdd}:{market}] API 오류: {e}")
             continue
