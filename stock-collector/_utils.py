@@ -87,6 +87,14 @@ def chunked_upsert(
     on_conflict: str,
     chunk: int = 500,
 ) -> None:
-    """rows 를 chunk 단위로 나누어 upsert."""
-    for i in range(0, len(rows), chunk):
-        supabase.table(table).upsert(rows[i:i + chunk], on_conflict=on_conflict).execute()
+    """rows 를 chunk 단위로 나누어 upsert.
+
+    PostgREST 일괄 upsert 는 요청 내 키 합집합을 컬럼으로 쓰므로, 어떤 행에 빠진 키는
+    NULL 로 덮어쓴다. 키 조합이 같은 행끼리 묶어 보내 기존 값을 보존한다.
+    """
+    groups: dict[tuple[str, ...], list[dict]] = {}
+    for row in rows:
+        groups.setdefault(tuple(sorted(row)), []).append(row)
+    for group in groups.values():
+        for i in range(0, len(group), chunk):
+            supabase.table(table).upsert(group[i:i + chunk], on_conflict=on_conflict).execute()

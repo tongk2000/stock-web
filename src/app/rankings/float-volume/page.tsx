@@ -29,9 +29,8 @@ export default async function FloatVolumeRankingPage() {
         <div className="mb-4 flex items-start gap-2 rounded-lg border border-border bg-card/50 px-3 py-2 text-xs text-muted-foreground">
           <Info className="mt-0.5 size-3.5 shrink-0" />
           <p>
-            유동주식수는 KRX 주요 지수(KOSPI200·KOSDAQ150·KRX300 등) 구성종목에
-            대해서만 공식 유동비율(FFR) 기반으로 집계됩니다. 비지수 종목은 이
-            랭킹에서 제외됩니다.
+            유동주식수는 발행주식수 × 유동비율(WiseReport 기준, 매주 갱신)로
+            계산합니다. 유동비율이 제공되지 않는 종목은 이 랭킹에서 제외됩니다.
           </p>
         </div>
 
