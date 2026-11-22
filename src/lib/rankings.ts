@@ -83,60 +83,32 @@ export async function getVolumeRanking(
       .filter((r): r is RankingTableRow => r !== null);
   }
 
-  // 거래량 급증: 최근 N+1 영업일 데이터로 (오늘 / 직전 N일 평균) 계산
-  // candles 테이블을 직접 읽어 클라이언트 측에서 집계
-  const lookback = RANKING.VOLUME_SURGE_LOOKBACK_DAYS;
-  const sinceDays = lookback + 30; // 휴장일 여유
-  const since = new Date();
-  since.setDate(since.getDate() - sinceDays);
-  const sinceStr = since.toISOString().slice(0, 10);
+  // 거래량 급증: (오늘 / 직전 N일 평균) — v_volume_surge 에서 미리 계산
+  // (N = RANKING.VOLUME_SURGE_LOOKBACK_DAYS, 뷰 SQL 의 20 과 일치해야 함)
+  const { data } = await supabase
+    .from('v_volume_surge')
+    .select('stock_code, today_close, today_volume, surge_ratio')
+    .not('surge_ratio', 'is', null)
+    .order('surge_ratio', { ascending: false })
+    .limit(limit);
 
-  const { data: candles } = await supabase
-    .from('candles')
-    .select('stock_code, date, volume, close')
-    .eq('exchange', 'KRX')
-    .eq('candle_type', 'daily')
-    .gte('date', sinceStr)
-    .order('date', { ascending: false });
-
-  const grouped = new Map<string, { date: string; volume: number; close: number }[]>();
-  for (const row of candles ?? []) {
-    const list = grouped.get(row.stock_code) ?? [];
-    if (list.length <= lookback) {
-      list.push(row);
-      grouped.set(row.stock_code, list);
-    }
-  }
-
-  type Surge = { code: string; ratio: number; today_volume: number; today_close: number };
-  const surges: Surge[] = [];
-  for (const [code, rows] of grouped) {
-    if (rows.length < lookback + 1) continue;
-    const today = rows[0];
-    const prevAvg =
-      rows.slice(1, lookback + 1).reduce((s, r) => s + r.volume, 0) / lookback;
-    if (!prevAvg || prevAvg === 0) continue;
-    surges.push({
-      code,
-      ratio: today.volume / prevAvg,
-      today_volume: today.volume,
-      today_close: today.close,
-    });
-  }
-
-  surges.sort((a, b) => b.ratio - a.ratio);
-  const top = surges.slice(0, limit);
-  const meta = await fetchStockMeta(top.map((s) => s.code));
+  const top = (data ?? []) as {
+    stock_code: string;
+    today_close: number;
+    today_volume: number;
+    surge_ratio: number;
+  }[];
+  const meta = await fetchStockMeta(top.map((s) => s.stock_code));
 
   return top
     .map<RankingTableRow | null>((s) => {
-      const m = meta.get(s.code);
+      const m = meta.get(s.stock_code);
       if (!m) return null;
       return {
         code: m.code,
         name: m.name,
         market: m.market,
-        metric: `${s.ratio.toFixed(1)}배`,
+        metric: `${Number(s.surge_ratio).toFixed(1)}배`,
         metricTone: 'up',
         secondary: [
           { label: '거래량', value: formatNumber(s.today_volume) },
