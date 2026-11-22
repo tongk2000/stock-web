@@ -1,198 +1,58 @@
 # 주식 사이트
 
-차트와 토론방을 한 곳에서. 차트 메모/뉴스 연동, 가격 예측 랭킹, 품질 필터링 토론방.
+관심 종목의 주가·차트·기업정보·토론을 모아 보는 Next.js 프로젝트입니다.
 
-## 기술 스택
+## 처음 이 프로젝트를 읽는다면
 
-| 분류 | 기술 |
+**[초보자를 위한 프로젝트 설명서](docs/README.md)**에서 시작하세요. React와 Next.js 경험이 없는 독자를 기준으로 실제 소스를 따라 설명합니다.
+
+- [전체 구조와 현재 기능](docs/01-big-picture.md)
+- [실제 코드로 배우는 React·Next.js](docs/02-reading-code.md)
+- [화면별 파일 지도](docs/03-file-map.md)
+- [차트·로그인·즐겨찾기·토론의 데이터 흐름](docs/04-data-flows.md)
+- [실행·환경 변수·자동 수집·문제 해결](docs/05-running.md)
+- [작은 수정 실습과 AI에게 요청하는 방법](docs/06-practice.md)
+
+## 기술과 구조
+
+| 영역 | 기술 / 위치 |
 |---|---|
-| 프레임워크 | Next.js 16 (App Router, RSC) |
-| 언어 | TypeScript |
-| 스타일링 | Tailwind CSS v4 + shadcn/ui |
-| 데이터 페칭 | TanStack Query v5 |
-| 백엔드/DB | Supabase (PostgreSQL + Auth + RLS) |
-| 차트 | TradingView Lightweight Charts v5 |
-| 결제 | Stripe (예정) |
-| 배포 | Vercel (예정) |
+| 웹 | Next.js 16.2.3 App Router, React 19.2.4, TypeScript |
+| 스타일 | Tailwind CSS v4, shadcn/ui 관련 구성 |
+| 데이터·인증 | Supabase PostgreSQL, Auth, Realtime |
+| 차트 | Lightweight Charts v5 |
+| 페이지 / 화면 조각 | `src/app/` / `src/components/` |
+| 공유 상태 / 도우미 | `src/contexts/` / `src/lib/` |
+| 자료 수집 | `stock-collector/`의 Python, `.github/workflows/`의 예약 작업 |
+| DB 변경 이력 | `supabase/migrations/` |
 
-## 프로젝트 구조
+TanStack Query Provider와 5분 staleTime 설정은 있으나 현재 화면의 조회는 주로 직접 작성한 useEffect·Supabase 호출을 사용합니다.
 
-```
-src/
-├── app/                            # Next.js App Router
-│   ├── layout.tsx                  # 루트 레이아웃
-│   │                               #   ThemeProvider > AuthProvider > FavoritesProvider > SidebarProvider
-│   │                               #   AppHeader + LeftNav + {children}
-│   ├── page.tsx                    # 홈 (검색 안내 페이지)
-│   ├── sitemap.ts                  # 동적 sitemap.xml (종목 + 참여도 높은 토론글)
-│   ├── robots.ts                   # robots.txt (+ sitemap 참조, /auth 차단)
-│   ├── auth/
-│   │   ├── callback/route.ts       # OAuth 콜백 (세션 교환 + 온보딩 분기)
-│   │   └── setup/page.tsx          # 닉네임 설정 (신규 가입 온보딩)
-│   ├── discussions/
-│   │   ├── page.tsx                # 토론방 피드 (전체 최신글, 무한 스크롤)
-│   │   └── [id]/page.tsx           # 토론글 상세 (SSR, SEO용 영속 링크)
-│   └── stocks/[code]/
-│       ├── page.tsx                # 종목 상세 (차트 + 즐겨찾기 + 토론방)
-│       └── loading.tsx             # 로딩 스켈레톤
-├── components/
-│   ├── layout/
-│   │   ├── AppHeader.tsx           # 공통 상단 헤더 (햄버거·검색창·로그인)
-│   │   ├── LeftNav.tsx             # 왼쪽 사이드바 (네비·즐겨찾기·테마)
-│   │   └── query-provider.tsx      # TanStack Query 클라이언트 provider
-│   ├── chart/
-│   │   └── CandleChart.tsx         # TradingView Lightweight Charts 래퍼
-│   ├── discussion/
-│   │   └── DiscussionSection.tsx   # 종목별 토론방 (실시간 구독)
-│   ├── stock/
-│   │   ├── StockSearch.tsx         # 종목 검색 자동완성
-│   │   ├── StockChartSection.tsx   # 차트 영역 (가격·컨트롤·메모 모달)
-│   │   └── FavoriteButton.tsx      # 즐겨찾기 토글 버튼
-│   └── ui/                         # shadcn/ui 컴포넌트
-├── contexts/
-│   ├── AuthContext.tsx             # Supabase Auth 전역 상태
-│   ├── FavoritesContext.tsx        # 즐겨찾기 (로그인: Supabase / 비로그인: localStorage)
-│   └── SidebarContext.tsx          # 사이드바 열림 상태 (AppHeader ↔ LeftNav 공유)
-├── hooks/
-│   ├── useIsDark.ts               # 다크모드 여부 (MutationObserver)
-│   └── useScrollAtTop.ts          # 스크롤 방향 기반 헤더 표시 제어
-├── lib/
-│   ├── supabase/
-│   │   ├── client.ts              # 클라이언트 컴포넌트용 Supabase 클라이언트
-│   │   └── server.ts              # 서버 컴포넌트용 Supabase 클라이언트
-│   ├── format.ts                  # 공통 포맷 유틸 (상대 시간 등)
-│   ├── indicators.ts              # 기술적 지표 계산 (MA, BB, RSI, OBV, 봉 집계)
-│   ├── query-client.ts            # TanStack Query 설정 (staleTime 5분)
-│   └── utils.ts                   # cn() 등 범용 유틸
-└── types/
-    ├── stock.ts                   # Stock, Candle, CandleType
-    └── discussion.ts              # Post, DiscussionRoom
+## 실행
 
-stock-collector/                    # Python 데이터 수집 스크립트
-├── collect_candles.py              # 일봉 수집 (FinanceDataReader → Supabase)
-├── collect_financials.py           # 분기 재무 수집 (DART OpenAPI → Supabase)
-└── requirements.txt
+이 README가 있는 실제 앱 폴더에서 실행합니다. 이 작업 공간에서는 `source/stock-web/`입니다.
 
-supabase/
-└── migrations/                     # DB 마이그레이션 (순서대로 적용)
-    ├── 20260413000001_init_schema.sql       # 초기 스키마 + RLS
-    ├── 20260413000002_add_financials.sql    # 재무 정보 테이블
-    ├── 20260414000001_add_exchange_to_candles.sql  # 거래소(KRX/NXT) 컬럼
-    ├── 20260415000001_add_public_chart_notes.sql   # 차트 메모 프로토타입용 수정
-    ├── 20260416000001_add_onboarded.sql     # 온보딩 플래그
-    ├── 20260416000002_favorites_and_memo_fix.sql   # 즐겨찾기 테이블 + 메모 unique
-    └── 20260416000003_discussion_setup.sql  # 토론방 자동 생성 + 좋아요 + Realtime
-```
+1. Node.js를 준비합니다. 현재 lock 파일의 Next.js 최소 요구 조건은 20.9.0입니다.
+2. `npm ci`로 의존성을 설치합니다.
+3. `.env.local`이 없으면 `.env.example`을 복사하고 값을 채웁니다. 기존 파일은 덮어쓰지 않습니다.
+4. `NEXT_PUBLIC_SITE_URL`은 로컬 주소 `http://localhost:3000`, Supabase URL과 anon key는 연결할 프로젝트의 값으로 설정합니다.
+5. `npm run dev`를 실행하고 터미널에 표시된 주소를 엽니다.
 
-## 레이아웃 구조
+DB 테이블과 종목 데이터, Google 로그인 설정은 별도로 필요합니다. 환경 변수만으로 준비되지는 않습니다. 자세한 절차는 [실행 안내](docs/05-running.md)를 참고하세요.
 
-```
-┌─────────────────────────────────────┐  ← AppHeader (h-14, sticky top-0)
-│  ☰  [종목 검색창]     [프로필/로그인] │    모바일 ☰ → SidebarContext.toggle()
-├──────────┬──────────────────────────┤
-│          │                          │
-│  LeftNav │  page content            │
-│  (w-64)  │                          │
-│          │                          │
-└──────────┴──────────────────────────┘
-
-모바일: LeftNav 기본 숨김, ☰ 버튼으로 슬라이드 인/아웃
-데스크탑(sm+): LeftNav 항상 표시, ☰ 버튼 숨김
-```
-
-## 인증 흐름
-
-```
-[로그인 버튼] → Google OAuth → /auth/callback
-  ├── 기존 유저 (onboarded=true)  → 원래 페이지로 리다이렉트
-  └── 신규 가입 (onboarded=false) → /auth/setup (닉네임 설정) → 홈
-```
-
-- Google OAuth를 통한 소셜 로그인
-- 가입 시 Supabase trigger로 profiles 자동 생성
-- 닉네임 설정 완료 후 서비스 이용 가능
-
-## DB 스키마
-
-| 테이블 | 설명 |
+| 명령 | 용도 |
 |---|---|
-| `profiles` | 유저 프로필, 점수, 프리미엄 여부. 가입 시 자동 생성 |
-| `stocks` | 종목 코드/이름/시장 (KOSPI, KOSDAQ) |
-| `candles` | 일봉/주봉/월봉 OHLCV 데이터 |
-| `discussion_rooms` | 공식방 + 프리미엄 유저 개설방, 태그 지원 |
-| `posts` | 토론방 게시글 (최대 1000자) |
-| `favorites` | 유저별 즐겨찾기 종목 (RLS: 본인만 접근) |
-| `chart_memos` | 날짜별 차트 메모 (무료 종목당 5개 제한은 앱 레벨 처리) |
-| `financials` | 분기별 재무 정보 (매출/영업이익/순이익/EPS 등) |
-| `price_predictions` | 가격 예측 + 만기 실제가 저장 (랭킹 재료) |
-| `post_likes` | 게시글 좋아요 (트리거로 posts.like_count 자동 동기화) |
-| `user_blocks` | 유저 차단 목록 |
+| `npm run dev` | 개발 서버 |
+| `npm run lint` | 코드 규칙 검사 |
+| `npm run build` | 배포용 빌드 |
+| `npm run start` | 빌드한 결과 실행 |
 
-RLS(Row Level Security) 적용 완료. 주요 정책:
-- 종목/캔들: 전체 읽기 전용
-- 토론방 개설: 프리미엄 유저만
-- 메모/차단: 본인 데이터만 접근
+## 구현 범위
 
-## 데이터 수집 전략
+홈 관심 종목, 검색, 종목 차트·메모·기업정보·토론, 댓글·반응, Google 로그인, 즐겨찾기, 각종 랭킹과 네이버 현재가 조회 코드가 있습니다. 종목 상세의 시세·뉴스·공시·수급현황 탭과 NXT 단독 선택은 준비 중입니다. 결제와 가격 예측의 완성된 서비스 흐름은 확인되지 않았습니다.
 
-- **캔들 데이터**: 평일 장 마감 후 GitHub Actions 스케줄로 FinanceDataReader 배치 수집 → Supabase 저장 (KRX/NXT 별도)
-- **재무 데이터**: DART OpenAPI로 최근 4분기 연결재무제표 수집 (수동 실행)
-- **토론방**: Supabase Realtime(postgres_changes) 구독으로 실시간 게시글 반영
-- **실시간 현재가**: 초기에는 미구현, 트래픽/니즈 증가 시 추가 예정
+2026-09-23 로컬 소스 기준이며 운영 서비스의 작동 상태를 검증한 목록은 아닙니다. 예전 설명과 현재 구현이 달랐던 부분은 [실행 안내의 비교표](docs/05-running.md)에 기록했습니다. 특히 차트 메모 권한은 초기 SQL 뒤에 공개 정책으로 변경된 이력이 있어, 본인 전용 보관이라고 단정할 수 없습니다. [데이터 흐름과 권한 설명](docs/04-data-flows.md)을 참고하세요.
 
-## 시작하기
+## 기여·유지보수
 
-### 1. 의존성 설치
-
-```bash
-npm install
-```
-
-### 2. 환경 변수 설정
-
-`.env.example`을 복사해 `.env.local` 작성:
-
-```bash
-cp .env.example .env.local
-```
-
-[supabase.com](https://supabase.com) 에서 프로젝트 생성 후 `Settings > API`에서 키 복사:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-```
-
-### 3. DB 마이그레이션 적용
-
-```bash
-supabase link --project-ref <프로젝트-ref>
-supabase db push
-```
-
-프로젝트 ref는 대시보드 URL에서 확인: `https://supabase.com/dashboard/project/<ref>`
-
-### 4. 개발 서버 실행
-
-```bash
-npm run dev
-```
-
-## 구독 모델
-
-| 플랜 | 가격 | 차이 |
-|---|---|---|
-| 무료 | 0원 | 차트 메모 종목당 5개, 토론방 개설 불가 |
-| 프리미엄 | 월 $1 / 연 $10 | 메모 무제한, 토론방 개설 가능 |
-
-## SEO
-
-검색엔진 색인/노출을 위한 구조:
-
-- **개별 토론글 영속 URL** — `/discussions/[id]` SSR 라우트. 피드 카드 클릭 시 이 페이지로 이동하여 딥 링크·공유·색인이 가능합니다.
-- **조건부 색인** — `generateMetadata`에서 좋아요 또는 댓글 수가 `ENGAGEMENT_THRESHOLD`(기본 3) 이상인 글만 `index: true`. 그 외는 `noindex, follow` 처리해 저품질·스팸 글이 도메인 평판을 떨어뜨리지 않도록 합니다.
-- **`app/sitemap.ts`** — 홈·토론방 목록 + 전체 종목(`/stocks/[code]`) + 참여도 임계값 이상의 토론글을 포함하는 동적 sitemap.
-- **`app/robots.ts`** — `/auth/` 차단, sitemap 참조, `host` 지정.
-- **canonical / OpenGraph** — 상세 페이지에서 절대 경로 canonical과 `og:type=article`, `publishedTime` 메타를 제공합니다.
-- **`NEXT_PUBLIC_SITE_URL`** — sitemap·robots·canonical이 사용할 절대 URL. 배포 환경변수에 반드시 설정하세요 (예: `https://example.com`).
+수정 전에 [AGENTS.md](AGENTS.md)를 읽고, 변경한 기능의 설명서도 함께 갱신합니다. main에 DB 마이그레이션 변경을 push하면 자동 적용 workflow가 실행될 수 있습니다. 문구 수정과 DB 변경을 구분해서 작업하세요.
