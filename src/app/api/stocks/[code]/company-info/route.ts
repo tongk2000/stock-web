@@ -2,7 +2,7 @@
  * GET /api/stocks/[code]/company-info
  *
  * 종목 상세의 "기업정보" 탭에 필요한 데이터를 한 번에 모아 응답합니다.
- *   - stocks 테이블 메타데이터 (액면가/대용가/상장일 등)
+ *   - stocks 테이블 메타데이터 (액면가/상장일 등)
  *   - v_latest_financials 뷰 (PER/PBR/ROE/EPS 등 최신 분기)
  *   - 최근 252영업일 캔들 (5/20일 고저가, 52주 고저가 폴백)
  *   - Naver `/integration` 응답 (DB가 비어있을 때 PER/시총 등 보강)
@@ -21,9 +21,7 @@ type StockRow = {
   shares_outstanding: number | null;
   description?: string | null;
   face_value?: number | null;
-  substitute_value?: number | null;
   listing_date?: string | null;
-  ipo_price?: number | null;
   capital?: number | null;
   foreign_ownership_ratio?: number | null;
 };
@@ -135,7 +133,7 @@ export async function GET(
   ] = await Promise.all([
     supabase
       .from('stocks')
-      .select('shares_outstanding, description, face_value, substitute_value, listing_date, ipo_price, capital, foreign_ownership_ratio')
+      .select('shares_outstanding, description, face_value, listing_date, capital, foreign_ownership_ratio')
       .eq('code', code)
       .maybeSingle<StockRow>(),
     supabase
@@ -185,9 +183,7 @@ export async function GET(
   const data = {
     description: stock?.description ?? null,
     face_value: stock?.face_value ?? null,
-    substitute_value: stock?.substitute_value ?? null,
     listing_date: stock?.listing_date ?? null,
-    ipo_price: stock?.ipo_price ?? null,
     shares_outstanding: stock?.shares_outstanding ?? null,
     capital: stock?.capital ?? null,
     foreign_ownership_ratio: stock?.foreign_ownership_ratio ?? naver?.foreign_ownership_ratio ?? null,

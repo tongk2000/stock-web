@@ -17,9 +17,7 @@ interface CompanyInfoData {
   // stocks
   description: string | null;
   face_value: number | null;
-  substitute_value: number | null;
   listing_date: string | null;
-  ipo_price: number | null;
   shares_outstanding: number | null;
   capital: number | null;
   foreign_ownership_ratio: number | null;
@@ -146,7 +144,6 @@ export default function CompanyInfoSection({ stockCode }: { stockCode: string })
     { label: '현재가', value: fmt(data.today_close, ''), color: priceDir },
     { label: '전일종가', value: fmt(data.prev_close) },
     { label: '액면가', value: fmt(data.face_value) },
-    { label: '대용가', value: fmt(data.substitute_value) },
     { label: '5일고가', value: fmt(data.high_5d), color: 'red' },
     { label: '5일저가', value: fmt(data.low_5d), color: 'blue' },
     { label: '20일고가', value: fmt(data.high_20d), color: 'red' },
@@ -157,9 +154,7 @@ export default function CompanyInfoSection({ stockCode }: { stockCode: string })
       label: '상장일',
       value: data.listing_date ? data.listing_date.replace(/-/g, '.') : '-',
     },
-    { label: '공모가', value: fmt(data.ipo_price) },
     { label: '상장주수', value: fmt(data.shares_outstanding) },
-    { label: '추가상장', value: '0' },
     { label: '시가총액(억)', value: fmtAok(data.market_cap) },
     { label: '자본금(억)', value: fmtAok(data.capital) },
     { label: '순이익 기준월', value: netIncomeMonth(data.year, data.quarter) },
