@@ -19,7 +19,7 @@ export type RankingTableRow = {
   market: 'KOSPI' | 'KOSDAQ';
   metric: string;                 // 포맷팅된 메트릭 문자열 (예: "+12.34%", "1.23조")
   metricTone?: 'up' | 'down' | 'neutral';
-  secondary?: { label: string; value: string }[];
+  secondary?: { label: string; value: string; tone?: 'up' | 'down' | 'neutral' }[];
 };
 
 interface Props {
@@ -84,7 +84,16 @@ export default function RankingTable({
                     {row.secondary.map((s) => (
                       <span key={s.label}>
                         <span className="opacity-70">{s.label} </span>
-                        <span className="tabular-nums text-foreground/80">{s.value}</span>
+                        <span
+                          className={cn(
+                            'tabular-nums',
+                            s.tone === 'up' && 'text-red-500',
+                            s.tone === 'down' && 'text-blue-500',
+                            (!s.tone || s.tone === 'neutral') && 'text-foreground/80',
+                          )}
+                        >
+                          {s.value}
+                        </span>
                       </span>
                     ))}
                   </div>

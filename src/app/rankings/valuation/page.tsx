@@ -45,7 +45,7 @@ export default async function ValuationRankingPage({
   const rows = await getValuationRanking(current);
 
   return (
-    <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
+    <main className="min-h-screen bg-background px-3 py-6 sm:px-6 sm:py-8 font-sans">
       <div className="mx-auto max-w-3xl">
         <h1 className="mb-1 text-2xl font-bold text-foreground">가치·시총 랭킹</h1>
         <p className="mb-4 text-sm text-muted-foreground">

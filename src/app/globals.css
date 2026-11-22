@@ -6,7 +6,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
+  /* 한글은 Pretendard(layout.tsx에서 CDN 로드), 없으면 OS 한글 글꼴. 자기 참조(var(--font-sans))면 무효가 되어 Times로 떨어진다 */
+  --font-sans: "Pretendard Variable", Pretendard, var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -125,6 +126,8 @@
   }
   html {
     @apply font-sans;
+    letter-spacing: -0.01em;
+    font-feature-settings: "tnum";
   }
 }
 

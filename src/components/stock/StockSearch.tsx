@@ -16,7 +16,8 @@ import { useRouter, usePathname } from 'next/navigation';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export default function StockSearch() {
+/** compact: 데스크톱 헤더(h-14)용 낮은 입력창. 모바일 하단바는 손가락 크기를 위해 기본값 */
+export default function StockSearch({ compact = false }: { compact?: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
   const [query, setQuery] = useState('');
@@ -52,10 +53,12 @@ export default function StockSearch() {
         placeholder={isNavigating ? '검색 중...' : '종목 · 토론글 검색'}
         disabled={isNavigating}
         className={cn(
-          'w-full rounded-xl border border-input bg-card py-3.5 pl-11 pr-10',
+          'w-full rounded-xl border border-input bg-card pl-11 pr-10',
+          compact ? 'py-2' : 'py-3',
           'text-foreground placeholder:text-muted-foreground outline-none',
           'focus:border-ring focus:ring-1 focus:ring-ring',
-          'text-base transition-colors',
+          compact ? 'text-sm' : 'text-base',
+          'transition-colors',
           isNavigating && 'cursor-wait opacity-70',
         )}
         autoComplete="off"

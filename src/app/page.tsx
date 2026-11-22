@@ -12,7 +12,7 @@ import FavoriteDiscussionFeed from '@/components/discussion/FavoriteDiscussionFe
 
 export default function Home() {
   return (
-    <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
+    <main className="min-h-screen bg-background px-3 py-6 sm:px-6 sm:py-8 font-sans">
       <div className="mx-auto max-w-4xl">
         <section className="mb-10">
           <h1 className="mb-4 text-2xl font-bold text-foreground">내 관심 종목</h1>

@@ -542,7 +542,7 @@ export default function StockChartSection({ code }: Props) {
                 <button
                   type="button"
                   onClick={saveMemo}
-                  className="rounded-xl bg-violet-500/20 px-5 py-2.5 text-sm font-semibold text-violet-400 ring-1 ring-violet-500/30 active:bg-violet-500/30"
+                  className="rounded-xl bg-blue-500/20 px-5 py-2.5 text-sm font-semibold text-blue-400 ring-1 ring-blue-500/30 active:bg-blue-500/30"
                 >
                   저장
                 </button>

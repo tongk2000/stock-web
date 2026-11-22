@@ -307,7 +307,7 @@ export default function DiscussionSection({ roomId, stockCode }: Props) {
           <button
             onClick={handleSubmit}
             disabled={user ? (!content.trim() || submitting) : false}
-            className="rounded-lg bg-violet-500/20 px-4 py-1.5 text-sm font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="rounded-lg bg-blue-500/20 px-4 py-1.5 text-sm font-medium text-blue-400 ring-1 ring-blue-500/30 transition-colors hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {user ? (submitting ? '등록 중...' : '등록') : '로그인'}
           </button>

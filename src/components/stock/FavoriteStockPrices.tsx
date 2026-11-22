@@ -113,7 +113,7 @@ export default function FavoriteStockPrices() {
         <Star className="mx-auto mb-3 size-6 text-amber-500" />
         <p className="text-sm font-medium text-foreground">즐겨찾기한 종목이 없습니다</p>
         <p className="mt-1 text-xs text-muted-foreground">
-          <Link href="/rankings" className="text-violet-500 hover:underline">
+          <Link href="/rankings" className="text-blue-500 hover:underline">
             랭킹 페이지
           </Link>
           에서 관심 종목을 찾아 별표를 눌러보세요.

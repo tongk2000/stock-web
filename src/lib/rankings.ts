@@ -76,7 +76,7 @@ export async function getVolumeRanking(
           metricTone: 'neutral',
           secondary: [
             { label: '종가', value: `${formatNumber(r.today_close)}원` },
-            { label: '등락', value: formatPercent(r.change_rate) },
+            { label: '등락', value: formatPercent(r.change_rate), tone: toneFromChange(r.change_rate) },
           ],
         };
       })
@@ -210,7 +210,7 @@ export async function getMoversRanking(
         metric: `${formatNumber(metricValue)}원`,
         metricTone: isHigh ? 'up' : 'down',
         secondary: [
-          { label: '등락', value: formatPercent(ch?.change_rate ?? null) },
+          { label: '등락', value: formatPercent(ch?.change_rate ?? null), tone: toneFromChange(ch?.change_rate ?? null) },
           { label: '거래대금', value: formatKRWCompact(ch?.today_value ?? null) },
         ],
       };
@@ -312,7 +312,7 @@ export async function getFloatVolumeRanking(
     secondary: [
       { label: '거래량', value: formatNumber(r.today_volume) },
       { label: '유동주식', value: formatNumber(r.float_shares) },
-      { label: '등락', value: formatPercent(r.change_rate) },
+      { label: '등락', value: formatPercent(r.change_rate), tone: toneFromChange(r.change_rate) },
     ],
   }));
 }

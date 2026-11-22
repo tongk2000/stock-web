@@ -58,7 +58,7 @@ export default async function StockPage({ params }: Props) {
   }
 
   return (
-    <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
+    <main className="min-h-screen bg-background px-3 py-6 sm:px-6 sm:py-8 font-sans">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-foreground">{stock.name}</h1>

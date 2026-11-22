@@ -41,12 +41,17 @@ export default function RootLayout({
 
   return (
     <html
-      lang="en"
+      lang="ko"
       suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: scriptStr }} />
+        {/* 한글 본문 글꼴. 쓰는 글자만 내려받는 dynamic subset */}
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css"
+        />
       </head>
       {/*
        * 전체 레이아웃 구조:

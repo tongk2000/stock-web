@@ -29,7 +29,7 @@ export default async function SectorDetailPage({ params }: Props) {
   const rows = await getSectorConstituents(sector);
 
   return (
-    <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
+    <main className="min-h-screen bg-background px-3 py-6 sm:px-6 sm:py-8 font-sans">
       <div className="mx-auto max-w-3xl">
         <Link
           href="/rankings/sectors"

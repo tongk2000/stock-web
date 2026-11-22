@@ -279,7 +279,7 @@ export default function CommentSection({ postId }: Props) {
           <button
             onClick={handleSubmit}
             disabled={user ? (!content.trim() || submitting) : false}
-            className="self-end rounded-lg bg-violet-500/20 px-3 py-1.5 text-xs font-medium text-violet-400 ring-1 ring-violet-500/30 transition-colors hover:bg-violet-500/30 disabled:cursor-not-allowed disabled:opacity-50"
+            className="self-end rounded-lg bg-blue-500/20 px-3 py-1.5 text-xs font-medium text-blue-400 ring-1 ring-blue-500/30 transition-colors hover:bg-blue-500/30 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {user ? (submitting ? '등록 중' : '등록') : '로그인'}
           </button>
@@ -317,7 +317,7 @@ function CommentItem({
       </div>
       <p className="mt-0.5 whitespace-pre-wrap break-words text-sm text-foreground">
         {comment.reply_to_nickname && (
-          <span className="mr-1 font-medium text-violet-400">
+          <span className="mr-1 font-medium text-blue-400">
             @{comment.reply_to_nickname}
           </span>
         )}

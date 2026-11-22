@@ -100,7 +100,7 @@ export default async function PostDetailPage({ params }: Props) {
   const profile = firstOrNull(post.profiles);
 
   return (
-    <main className="min-h-screen bg-background px-2 py-6 sm:px-6 sm:py-8 font-sans">
+    <main className="min-h-screen bg-background px-3 py-6 sm:px-6 sm:py-8 font-sans">
       <div className="mx-auto max-w-2xl">
         <nav aria-label="breadcrumb" className="mb-4 text-xs text-muted-foreground">
           <Link href="/discussions" className="hover:text-foreground">
