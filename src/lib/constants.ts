@@ -76,6 +76,7 @@ export const RANKING = {
  * - SEARCH_POSTS               : /search 페이지 토론글 검색 결과 최대 개수
  * - SITEMAP_MAX_POSTS          : sitemap.xml에 포함할 최대 게시글 수
  * - COMPANY_INFO_LOOKBACK_DAYS : CompanyInfoSection의 5일/20일 고저가 계산용 캔들 lookback
+ * - COMPANY_INFO_52W_MIN_CANDLES : 52주 고저가를 캔들로 계산하기 위한 최소 캔들 수 (미만이면 Naver 폴백)
  * - BATCH_PRICE_CODES          : `/api/stock/today` 단일 요청에서 허용하는 종목 수 상한
  */
 export const LIMITS = {
@@ -83,6 +84,7 @@ export const LIMITS = {
   SEARCH_POSTS: 20,
   SITEMAP_MAX_POSTS: 10000,
   COMPANY_INFO_LOOKBACK_DAYS: 20,
+  COMPANY_INFO_52W_MIN_CANDLES: 240,
   BATCH_PRICE_CODES: 50,
 } as const;
 

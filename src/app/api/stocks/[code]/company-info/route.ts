@@ -159,6 +159,10 @@ export async function GET(
   let financials = okData(financialsRes.data, financialsRes.error);
   const candles = candlesRes.error ? [] : candlesRes.data ?? [];
   const lookback20 = candles.slice(0, LIMITS.COMPANY_INFO_LOOKBACK_DAYS);
+  // 52주 고저가도 5/20일 고저가와 같은 KRX 정규장 캔들로 계산한다. Naver 값은 NXT 등을
+  // 포함해 KRX 저가보다 낮게 나올 수 있어(52주 최저 < 5일저가처럼 보임) 캔들이 1년치에
+  // 못 미치는 신규 상장·수집 누락 종목에만 폴백으로 쓴다.
+  const hasYearOfCandles = candles.length >= LIMITS.COMPANY_INFO_52W_MIN_CANDLES;
 
   if (stockRes.error) {
     const fallback = await supabase
@@ -206,8 +210,8 @@ export async function GET(
     low_5d: minLow(candles.slice(0, 5)),
     high_20d: maxHigh(lookback20),
     low_20d: minLow(lookback20),
-    high_52w: naver?.high_52w ?? maxHigh(candles),
-    low_52w: naver?.low_52w ?? minLow(candles),
+    high_52w: hasYearOfCandles ? maxHigh(candles) : (naver?.high_52w ?? maxHigh(candles)),
+    low_52w: hasYearOfCandles ? minLow(candles) : (naver?.low_52w ?? minLow(candles)),
   };
 
   return NextResponse.json({ data });
