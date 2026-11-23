@@ -4,7 +4,7 @@
 
 ## 이 폴더
 
-- `migrations/`: 스키마의 유일한 원본 SQL. 파일 이름의 시간 접두 순서로 적용된다(20개). 테이블·뷰·함수·트리거·RLS·Realtime이 모두 여기 있다.
+- `migrations/`: 스키마의 유일한 원본 SQL. 파일 이름의 시간 접두 순서로 적용된다(21개). 테이블·뷰·함수·트리거·RLS·Realtime이 모두 여기 있다.
 - `config.toml`: 로컬 CLI 설정(`project_id = "web"`, Postgres 17, API `max_rows = 1000`, 로컬 메일 `[local_smtp]`). 원격 DB 설정이 아니다.
 - `.temp/`: CLI 캐시(`cli-latest`). `.gitignore`가 `.temp`·`.branches`·`.env.local` 등을 무시한다. 손대지 않는다.
 - DB를 쓰는 쪽은 웹 `src/`(anon 키, RLS 적용)와 [stock-collector](../stock-collector/CLAUDE.md)(service_role)다.
@@ -20,7 +20,8 @@
 | 종목 생길 때 공식 토론방 자동 생성 | `migrations/20260416000003_discussion_setup.sql`의 `handle_new_stock` | 테이블 `discussion_rooms`는 init |
 | 일봉, KRX/NXT, 인덱스 | `migrations/20260413000001_init_schema.sql`의 `candles` | `exchange`: `migrations/20260414000001_add_exchange_to_candles.sql`, 날짜 범위 인덱스: `migrations/20261122000001_ranking_materialized_views.sql` |
 | 재무 테이블과 열 | `migrations/20260413000002_add_financials.sql`의 `financials` | `bps`·`ev_ebitda` 등: `migrations/20260429000001_company_info_fields.sql`, `equity`·`total_assets`: `migrations/20260502000001_financials_balance_sheet.sql` |
-| 공매도 잔고 | `migrations/20260420000001_add_short_balances.sql`의 `short_balances` | `src/`에서 읽는 곳을 grep으로 못 찾았다 |
+| 공매도 잔고 | `migrations/20260420000001_add_short_balances.sql`의 `short_balances` | `src/`에서 읽는 곳을 grep으로 못 찾았다. KRX 로그인 요구로 0건 |
+| 공매도 일별 체결, 신용잔고 | `migrations/20261123000001_short_sales_credit_balances.sql`의 `short_sales`, `credit_balances` | 수집 `stock-collector/collect_kis_flows.py`(KIS). 웹은 기업정보 신용잔고비율과 차트 패널 |
 | 토론 글·좋아요·카운트 트리거 | `migrations/20260413000001_init_schema.sql`의 `posts` | `post_likes`·`sync_post_like_count`: `migrations/20260416000003_discussion_setup.sql`, 보안 수정: `migrations/20260417000003_fix_trigger_security.sql` |
 | 댓글·대댓글, 깊이 제한 | `migrations/20260417000001_add_comments.sql`의 `comments`, `enforce_comment_depth` | `sync_post_comment_count`도 같은 파일 |
 | 싫어요, 즐겨찾기 | `migrations/20260417000002_add_dislikes.sql`의 `post_dislikes` | `favorites`: `migrations/20260416000002_favorites_and_memo_fix.sql` |
@@ -78,3 +79,4 @@
 | `20261122000003_tighten_memo_and_profile_rls.sql` | `chart_memos` 정책을 본인 행만으로, `unique (stock_code, date)` 제거. `profiles` update를 `nickname`·`onboarded` 열로 제한 |
 | `20261122000004_service_role_statement_timeout.sql` | `service_role`의 `statement_timeout`을 5분으로(authenticator의 8초를 물려받아 `refresh_ranking_views()`가 실패하던 문제) |
 | `20261122000005_financials_net_income_ttm.sql` | `financials.net_income_ttm`(최근 4분기 당기순이익). 분기 행의 `net_income`은 3개월치라 PER·EPS·ROE는 이 값으로 계산 |
+| `20261123000001_short_sales_credit_balances.sql` | `short_sales`(공매도 일별 체결 수량·대금·비중), `credit_balances`(융자 잔고 수량·금액·잔고율, 대주 잔고). PK 종목+날짜, 공개 select |
