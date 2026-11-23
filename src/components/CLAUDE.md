@@ -41,6 +41,7 @@
 
 ## 지킬 것
 
+- **차트 패널 높이는 드래그를 끝낼 때만 저장한다**(`CandleChart`의 `saveSubHeights`: 모바일 `onSepEnd`, 데스크톱 `mouseup`). 2026-11-23까지는 effect cleanup에서도 저장했는데, 공매도·신용 패널을 켜면 데이터 도착으로 차트가 곧바로 다시 만들어지면서 레이아웃 전 높이(30px 안팎)가 저장돼 패널이 납작해졌다. `loadPaneH`는 50 미만 값을 버린다.
 - 토론방 실시간(`DiscussionSection`): 채널 `room:<roomId>`가 `posts`의 INSERT·UPDATE·DELETE를 듣고 로컬 `posts`에 증분 반영한다(리페치 없음). INSERT는 새 id로 `POST_SELECT`를 한 번 조회해 앞에 붙이고, UPDATE는 세 카운트만, DELETE는 id로 거른다(필터 없이 구독). 내 글도 INSERT 이벤트로 받으니 Realtime이 끊기면 안 보인다. 댓글은 `insert().select()`로 바로 넣고 id로 중복을 막는다.
 - 구독은 `useEffect` cleanup에서 `supabase.removeChannel(channel)`로 푼다(세 곳 모두). 새 구독도 같이 한다. 빠지면 채널이 쌓인다.
 - 차트 흐름: `StockChartSection`이 `candles` 테이블 일봉을 읽는다. `통합`은 KRX·NXT를 `mergeCandles`로 합치고(KRX 날짜 기준, 거래량 합, 시가·종가는 KRX), `KRX`는 그대로 쓴다. NXT 버튼은 `disabled`('준비 중')다. 오늘 봉을 얹고 `aggregateCandles`로 주·월봉을 만들어 `CandleChart`에 넘긴다.

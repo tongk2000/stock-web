@@ -122,8 +122,9 @@ const CREDIT_COLOR = '#f472b6';
 
 function loadPaneH(key: string, def: number): number {
   try {
-    const v = localStorage.getItem(key);
-    return v !== null ? Math.max(40, Number(v)) : def;
+    const v = Number(localStorage.getItem(key));
+    // 드래그 최소 높이(50) 미만·숫자 아님은 레이아웃 전 값이 저장된 것으로 보고 기본값을 쓴다
+    return Number.isFinite(v) && v >= 50 ? v : def;
   } catch { return def; }
 }
 function savePaneH(key: string, h: number) {
@@ -267,6 +268,8 @@ export default function CandleChart({
             if (a >= 1000000) return (price / 1000000).toFixed(1).replace(/\.0$/, '') + 'M';
             return (price / 1000).toFixed(1).replace(/\.0$/, '') + 'K';
           }
+          // 공매도 비중·신용잔고율 같은 % 패널은 소수점이 필요하다(반올림하면 축이 0으로 보인다)
+          if (a < 100 && !Number.isInteger(price)) return price.toFixed(2);
           return Math.round(price).toLocaleString('en-US');
         },
       },
@@ -712,6 +715,8 @@ export default function CandleChart({
     el.addEventListener('touchstart', onSepStart,  { passive: false });
     el.addEventListener('touchmove',  onSepMove,   { passive: false });
     el.addEventListener('touchend',   onSepEnd);
+    // 데스크톱은 lwc 기본 패널 리사이즈를 쓰므로 마우스를 뗄 때 높이를 저장한다
+    el.addEventListener('mouseup',    saveSubHeights);
 
     chartRef.current        = chart;
     candleSeriesRef.current = candleSeries;
@@ -722,11 +727,12 @@ export default function CandleChart({
       el.removeEventListener('touchstart', onSepStart);
       el.removeEventListener('touchmove',  onSepMove);
       el.removeEventListener('touchend',   onSepEnd);
+      el.removeEventListener('mouseup',    saveSubHeights);
       if (lpTimer) clearTimeout(lpTimer);
       // 패널 legend 제거
       Object.values(legends).forEach(lg => lg?.remove());
-      // 서브 패널 높이만 저장 (가격 패널은 항상 나머지로 계산)
-      saveSubHeights();
+      // 여기서 높이를 저장하지 않는다: 데이터 도착으로 막 만든 차트를 곧바로 다시 만들면
+      // 레이아웃 전 높이(30px 안팎)가 저장돼 패널이 납작해졌다. 저장은 드래그를 끝낼 때만
       ro.disconnect();
       chart.remove();
       chartRef.current        = null;
