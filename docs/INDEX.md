@@ -91,7 +91,7 @@
 
 ## DB
 
-마이그레이션은 `supabase/migrations/`에 20개(2026-11-22)이고 파일 이름의 날짜순으로 적용된다. 앱은 `src/`에서 anon 키(RLS)로 읽고 쓰며, 수집기는 서비스 롤로 쓴다. 타입 선언은 `types/stock.ts`(`Stock`, `Candle`, `CandleType`), `types/discussion.ts`(`Post`, `DiscussionRoom`), `types/ranking.ts`(`DailyChangeRow`, `LatestFinancialsRow`, `ExtremesRow`, `RankingRow`, 탭 유니온 3개)에 있다. `favorites`, `comments`, `chart_memos`, `short_balances`, `v_volume_surge`, `v_float_volume_ranking`, `v_sector_ranking`의 타입은 따로 없고 쓰는 파일 안에서 인라인으로 선언한다. `types/discussion.ts`의 `Post`에는 `dislike_count`·`comment_count`가 없다.
+마이그레이션은 `supabase/migrations/`에 21개(2026-11-23)이고 파일 이름의 날짜순으로 적용된다. 앱은 `src/`에서 anon 키(RLS)로 읽고 쓰며, 수집기는 서비스 롤로 쓴다. 타입 선언은 `types/stock.ts`(`Stock`, `Candle`, `CandleType`), `types/discussion.ts`(`Post`, `DiscussionRoom`), `types/ranking.ts`(`DailyChangeRow`, `LatestFinancialsRow`, `ExtremesRow`, `RankingRow`, 탭 유니온 3개)에 있다. `favorites`, `comments`, `chart_memos`, `short_balances`, `v_volume_surge`, `v_float_volume_ranking`, `v_sector_ranking`의 타입은 따로 없고 쓰는 파일 안에서 인라인으로 선언한다. `types/discussion.ts`의 `Post`에는 `dislike_count`·`comment_count`가 없다.
 
 ### 테이블
 
@@ -109,6 +109,8 @@
 | `favorites` | 테이블 | 로그인 사용자의 관심 종목(`user_id,stock_code` PK, `stock_name`). 본인만 | `20260416000002_favorites_and_memo_fix.sql` | `contexts/FavoritesContext.tsx` | `contexts/FavoritesContext.tsx`(upsert 병합·insert·delete) |
 | `chart_memos` | 테이블 | 차트 날짜별 메모(500자). 본인 행만 읽기·쓰기·수정·삭제(2026-11-22 `20261122000003_tighten_memo_and_profile_rls.sql`. 그 전에는 프로토타입 정책으로 전체 공개였다). 유니크는 `(user_id, stock_code, date)`. `user_id`는 NULL 허용이고 FK가 없다 | `20260413000001_init_schema.sql`, `20260415000001_add_public_chart_notes.sql`, `20260416000002_favorites_and_memo_fix.sql`, `20261122000003_tighten_memo_and_profile_rls.sql` | `components/stock/StockChartSection.tsx` | `components/stock/StockChartSection.tsx`(upsert·delete) |
 | `short_balances` | 테이블 | 공매도 잔고(`stock_code,date` PK, 수량·금액·상장주식수·잔고 비중). KRX가 T+2 영업일 18:00 이후 공시 | `20260420000001_add_short_balances.sql` | `src/`에서 읽는 곳 없음(수급 탭은 KRX 위젯을 임베드) | `stock-collector/collect_short_balances.py` |
+| `short_sales` | 테이블 | 공매도 일별 체결(`stock_code,date` PK, 수량·대금·거래량 대비 비중·거래대금 대비 비중). KRX 정규장 기준 | `20261123000001_short_sales_credit_balances.sql` | 차트 공매도 패널 | `stock-collector/collect_kis_flows.py` |
+| `credit_balances` | 테이블 | 신용잔고 일별(`stock_code,date` PK, date는 매매일. 융자 잔고 수량·금액(원)·잔고율, 신규·상환 수량, 대주 잔고). 결제일 기준이라 최근 2영업일은 없음 | `20261123000001_short_sales_credit_balances.sql` | `app/api/stocks/[code]/company-info/route.ts`(신용잔고비율), 차트 신용잔고 패널 | `stock-collector/collect_kis_flows.py` |
 | `price_predictions` | 테이블 | 가격 예측(`user_id,stock_code,target_date` 유니크). 코드에서 쓰이지 않음(2026-11-22 grep) | `20260413000001_init_schema.sql` | 없음 | 없음 |
 | `user_blocks` | 테이블 | 사용자 차단. 코드에서 쓰이지 않음(2026-11-22 grep) | `20260413000001_init_schema.sql` | 없음 | 없음 |
 
@@ -139,6 +141,7 @@
 | `.github/workflows/collect_financials.yml`(재무 정보 수집) | `stock-collector/collect_financials.py`(최근 4분기 연결재무제표) | 월요일 10:00(`0 1 * * 1`) + 수동 | DART `opendart.fss.or.kr`(`corpCode.xml`, `fnlttSinglAcnt.json`) | `financials`(매출·영업이익·순이익·영업이익률·`equity`·`total_assets`) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY`(이 스크립트는 필수) |
 | `.github/workflows/collect_wisereport.yml`(기업 개요 보강) | `stock-collector/collect_wisereport.py` | 월요일 12:00(`0 3 * * 1`) + 수동 | WiseReport `navercomp.wisereport.co.kr` | `stocks`(`face_value`, `float_shares`, `description`, `listing_date`, `shares_outstanding`), `financials`(`ev_ebitda`, `dividend`) | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | `.github/workflows/collect_short_balances.yml`(공매도 잔고 수집) | `stock-collector/collect_short_balances.py --mode daily/retry/backfill` | 평일 18:10 daily(T-2 영업일 1일치), 평일 20:00 retry(최근 5영업일 중 빈 날짜), 수동 실행 때 모드 선택(backfill은 최근 365일) | pykrx(KRX 공매도 잔고) | `short_balances` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
+| `.github/workflows/collect_kis_flows.yml`(공매도·신용잔고 수집, KIS) | `stock-collector/collect_kis_flows.py --mode daily/backfill` | 평일 18:30 daily(공매도 최근 14일, 신용 최근 45일), 수동 실행 때 모드 선택(backfill은 최근 365일) | 한국투자증권 Open API(`FHPST04830000`, `FHPST04760000`) | `short_sales`, `credit_balances` | `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `KIS_APP_KEY`, `KIS_APP_SECRET` |
 | `.github/workflows/apply_migrations.yml`(Supabase 마이그레이션 적용) | 스크립트 없음. Supabase CLI 3.2.0으로 `supabase link` 후 `supabase db push --remote --yes` | `main`에 `supabase/migrations/**` 변경이 push될 때 + 수동 | Supabase 관리 API | 운영 DB 스키마 | `SUPABASE_ACCESS_TOKEN`, `SUPABASE_PROJECT_REF`(없으면 `SUPABASE_URL`에서 프로젝트 ref를 뽑는다) |
 
 ## 설정값
@@ -235,6 +238,7 @@
 | 섹터·업종 | KRX 업종명. `stocks.sector`(FinanceDataReader가 채움) |
 | 수급 | 투자자별 순매수(개인·외국인·기관). 수급현황 탭, 네이버 `trend` 응답 |
 | 공매도 잔고 | `short_balances`(pykrx, T+2 영업일 공시). 화면은 KRX 위젯 iframe을 쓴다 |
+| 공매도 체결·신용잔고 | `short_sales`(공매도 수량·비중), `credit_balances`(신용잔고율 = 융자 잔고 수량 ÷ 상장주식수). 한국투자증권 Open API로 받는다. 기업정보의 '신용잔고비율'은 `credit_balances`의 최신 값 |
 | 토론방·공식방 | `discussion_rooms`. 종목마다 공식방(`is_official`) 하나가 트리거로 생긴다. 코드에서 "room"은 이 방, 화면 이름은 "토론방" |
 | 관심 종목·즐겨찾기 | 같은 것. UI 문구는 "관심 종목", 코드는 `favorites`·`FavoritesContext` |
 | 메모 | 차트 날짜별 메모. `chart_memos`, "차트 메모" |

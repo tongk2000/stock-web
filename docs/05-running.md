@@ -126,6 +126,7 @@ Supabase 프로젝트 준비
 | 기업정보 | 월요일 09:00 | `collect_company_info.py` | 종목 정보·일부 재무 정보 |
 | 재무정보 | 월요일 10:00 | `collect_financials.py` | `financials` |
 | 공매도 잔고 | 평일 18:10, 재시도 20:00 | `collect_short_balances.py` | `short_balances` |
+| 공매도 체결·신용잔고 | 평일 18:30 | `collect_kis_flows.py` | `short_sales`, `credit_balances` |
 
 **cron**은 요일·시간을 쓰는 예약 표현입니다. **배치**는 자료를 한 번에 모아서 처리하는 작업입니다. 화면을 열어 놓아야 실행되는 작업이 아닙니다.
 

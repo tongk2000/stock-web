@@ -49,6 +49,7 @@ GitHub Actions. 모두 수동 실행(`workflow_dispatch`)도 된다. secret은 �
 | `collect_candles.yml` | 평일 16:00 KST(`0 7 * * 1-5`). `collect_candles.py` 다음 `calculate_ratios.py`. Python 3.10. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY` |
 | `collect_company_info.yml` | 매주 월 09:00 KST(`0 0 * * 1`). `collect_company_info.py`. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY` |
 | `collect_financials.yml` | 매주 월 10:00 KST(`0 1 * * 1`). `collect_financials.py`. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `DART_API_KEY` |
+| `collect_kis_flows.yml` | 평일 18:30 KST(`30 9 * * 1-5`, daily). 수동 실행은 `mode` 입력(daily·backfill). `collect_kis_flows.py --mode …`, 제한 120분. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `KIS_APP_KEY`, `KIS_APP_SECRET` |
 | `collect_short_balances.yml` | 평일 18:10 KST(daily, `10 9 * * 1-5`)와 20:00 KST(retry, `0 11 * * 1-5`). 수동 실행은 `mode` 입력(daily·retry·backfill). `collect_short_balances.py --mode …`. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 | `collect_wisereport.yml` | 매주 월 12:00 KST(`0 3 * * 1`). `collect_wisereport.py`. secret: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` |
 

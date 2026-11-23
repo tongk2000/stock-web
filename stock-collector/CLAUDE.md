@@ -13,9 +13,10 @@
 | `collect_financials.py` | `collect_financials.yml`, 월 10:00 | DART OpenAPI(`corpCode.xml`, `fnlttSinglAcnt.json`, 연결재무제표 최근 4분기) | `financials`(매출·이익·`equity`·`total_assets`) |
 | `collect_company_info.py` | `collect_company_info.yml`, 월 09:00 | pykrx(주식수·시총·DPS·외국인지분율 — 2026-11 기준 KRX 로그인 요구로 전부 빈 결과), FinanceDataReader(업종·상장일), DART(자본금) | `stocks`, `financials.dividend` |
 | `collect_wisereport.py` | `collect_wisereport.yml`, 월 12:00 | WiseReport 기업모니터(`navercomp.wisereport.co.kr`의 `c1010001`·`c1020001`) | `stocks`(액면가·유동주식수·개요·상장일·발행주식수), `financials.ev_ebitda`·`dividend`(현금 DPS) |
-| `collect_short_balances.py` | `collect_short_balances.yml`, 평일 18:10(daily)·20:00(retry) | pykrx 공매도 잔고(KRX 공시 T+2 영업일 18:00 이후) | `short_balances` |
+| `collect_short_balances.py` | `collect_short_balances.yml`, 평일 18:10(daily)·20:00(retry) | pykrx 공매도 잔고(KRX 공시 T+2 영업일 18:00 이후). 2026-11 기준 KRX 로그인 요구로 0건 | `short_balances` |
+| `collect_kis_flows.py` | `collect_kis_flows.yml`, 평일 18:30(daily). 수동 실행 `mode`에 backfill(1년) | 한국투자증권 Open API 공매도 일별추이 `FHPST04830000`, 신용잔고 일별추이 `FHPST04760000` | `short_sales`, `credit_balances` |
 
-환경 변수는 이름만: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`(모든 스크립트), `DART_API_KEY`(`collect_financials.py`는 필수, `collect_company_info.py`는 없으면 자본금만 건너뜀). `_utils.get_supabase`가 `.env`도 읽는다. 워크플로 Python은 3.10, 의존성은 `requirements.txt`(고정 버전 전체 목록).
+환경 변수는 이름만: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`(모든 스크립트), `DART_API_KEY`(`collect_financials.py`는 필수, `collect_company_info.py`는 없으면 자본금만 건너뜀), `KIS_APP_KEY`·`KIS_APP_SECRET`(`collect_kis_flows.py`, 한국투자증권 실전 계좌 앱키. 로컬 원본은 저장소 밖 `../../.secret/keys.env`). `_utils.get_supabase`가 `.env`도 읽는다. 워크플로 Python은 3.10, 의존성은 `requirements.txt`(고정 버전 전체 목록).
 
 ## 어디를 볼까
 
@@ -29,6 +30,7 @@
 | 재무 분기 선택, DART 계정·보고서 코드, TTM | `collect_financials.py`의 `get_target_quarters`, `parse_financials`, `extract_amount`, `net_income_ytd`, `trailing_net_income`, `REPRT_CODE_MAP` | |
 | 재무 비율 계산, numeric overflow | `calculate_ratios.py`의 `calculate`, `main`, `_utils.py`의 `fit_numeric` | 커밋 `7416fca`. 열 정밀도는 `supabase/migrations/20260413000002_add_financials.sql` |
 | 공매도 daily·retry·backfill | `collect_short_balances.py`의 `run_daily`, `run_retry`, `run_backfill`, `missing_business_days`, `target_date_for_daily` | 모드는 `--mode`, 수동 실행은 워크플로 입력 `mode` |
+| 공매도 체결·신용잔고(KIS) | `collect_kis_flows.py`의 `fetch_short`, `fetch_credit`, `kis_get`, `RateLimiter`, `run` | 공매도는 기간 지정·최대 100영업일, 신용은 기준일부터 거꾸로 30영업일씩 |
 | 영업일 계산 | `_utils.py`의 `get_last_business_day`, `prev_business_day`, `recent_business_days` | 주말만 거른다. 공휴일은 모른다 |
 | 랭킹 뷰 갱신 | `collect_candles.py`의 `main` | 함수는 `supabase/migrations/20261122000002_volume_surge_view.sql`. 약 36초 걸려 service_role 타임아웃을 5분으로 올렸다(`20261122000004`). 실패해도 경고만 남기고 다음 단계(비율 계산)는 돈다 |
 | 요청 실패·재시도·간격 | `collect_financials.py`의 `get_financial_data`·`main`, `collect_company_info.py`의 `_get_capital`·`collect_dart_capital`, `collect_wisereport.py`의 `fetch_one` | 아래 '지킬 것' |
@@ -49,6 +51,7 @@
 - **Python 3.10 문법만.** 워크플로가 3.10이다. `X | None`은 되지만 `tomllib`·`ExceptionGroup`·`typing.Self` 같은 3.11+ 기능은 쓰지 않는다.
 - **날짜는 러너의 UTC 시계다.** `datetime.now()`를 그대로 쓴다. 평일 16:00·18:10 KST는 UTC도 같은 날이라 맞지만, 월요일 09:00 KST(UTC 00:00) 실행은 "오늘"이 월요일이라 기준일이 아직 장이 열리지 않은 날이다. `collect_company_info.py`의 pykrx가 그날 데이터를 주는지 확인 못 함.
 - **재무 수치의 의미.** `collect_financials.py`는 분기마다 보고서의 `thstrm_amount`를 저장한다. Q1~Q3는 3개월치, Q4(사업보고서)는 연간치다(2026-11-22 삼성전자 저장값으로 확인: 2026 분기 매출 134·171·195조, 2025 Q4 334조). 그래서 PER·EPS·ROE는 `net_income`이 아니라 `net_income_ttm`(최신 행에만, `trailing_net_income`: 전년 연간 + 올해 누적 − 전년 같은 기간 누적)으로 계산한다. 분기 행 하나로 계산했을 때 펄어비스 PER이 162(네이버 6.6)로 나왔다. TTM을 못 구하면 Q4 행일 때만 연간치를 쓰고 아니면 비운다.
+- **KIS 응답 단위와 한도.** 신용잔고 금액 `whol_loan_rmnd_amt`는 만원 단위라 원으로 바꿔 저장한다(삼성전자 잔고 수량 × 평균단가로 맞춰 봄). 공매도 대금 `ssts_tr_pbmn`은 원. 실전 키는 초당 20건이라 `RATE_PER_SEC` 15로 묶는다(초과는 `EGW00201`, 쉬고 재시도). 토큰(`/oauth2/tokenP`)은 1분에 한 번만 발급되니 실행마다 한 번 받는다. 신용잔고는 결제일(T+2) 기준이라 최근 2영업일은 비어 있다. 공매도는 장중에 부르면 그날 행이 중간값이라 저녁 daily가 덮어쓴다.
 - **비밀값은 이름만 쓴다.** 키를 코드·로그·문서에 적지 않는다.
 
 ## 파일
@@ -62,6 +65,7 @@
 | `collect_candles.py` | KOSPI·KOSDAQ 일봉 증분 수집(KRX·NXT), `stocks` upsert, 끝에 랭킹 뷰 갱신 |
 | `collect_company_info.py` | pykrx·FinanceDataReader·DART로 `stocks` 업종·상장일·주식수·외국인지분율·자본금과 `financials.dividend` 갱신 |
 | `collect_financials.py` | DART 연결재무제표 최근 4분기 매출·영업이익·순이익·자본·자산 수집 |
+| `collect_kis_flows.py` | 한국투자증권 Open API로 종목별 공매도 일별 체결·신용잔고를 daily·backfill 모드로 수집 |
 | `collect_short_balances.py` | pykrx 공매도 잔고를 daily·retry·backfill 모드로 수집 |
 | `collect_wisereport.py` | WiseReport에서 액면가·유동주식수·기업개요·상장일·EV/EBITDA·현금DPS 보강 |
 | `requirements.txt` | pip 의존성(고정 버전). 워크플로가 캐시 키로도 쓴다 |
