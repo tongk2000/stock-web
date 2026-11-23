@@ -366,8 +366,10 @@ export default function CandleChart({
     }
 
     // 각 패널 높이 개별 적용 (서브 패널이 서로의 크기에 영향을 주지 않음)
-    chart.panes()[0].setHeight(priceH);
-    active.forEach((_, i) => chart.panes()[i + 1]?.setHeight(subH[i]));
+    // 높이를 비율(stretch factor)로 한 번에 준다. setHeight를 패널마다 차례로 부르면
+    // 뒤 패널을 맞추느라 앞 패널이 줄어들어 서브 패널이 셋 이상일 때 납작해졌다
+    chart.panes()[0].setStretchFactor(priceH);
+    active.forEach((_, i) => chart.panes()[i + 1]?.setStretchFactor(subH[i]));
 
     // 보조지표 패널 좌상단 legend div — 래퍼 div에 직접 붙여 pane DOM 의존성 제거
     const mkLegend = (topY: number): HTMLDivElement => {
