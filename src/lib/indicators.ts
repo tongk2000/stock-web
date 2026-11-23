@@ -110,6 +110,21 @@ export function calcOBV(candles: Candle[]): { time: string; value: number }[] {
 // ── 데이터 집계 (주봉, 월봉) ──────────────────────────────────────────────────
 
 /**
+ * 일봉 날짜(YYYY-MM-DD)가 속한 주·월봉 묶음의 키.
+ * 일봉은 날짜 그대로, 주봉은 그 주 월요일 날짜, 월봉은 "YYYY-MM".
+ * `aggregateCandles`와 차트 보조 데이터(`lib/short-credit.ts`)가 같은 묶음을 쓰도록 공유한다.
+ */
+export function candleGroupKey(date: string, type: CandleType): string {
+  if (type === 'daily') return date;
+  if (type === 'monthly') return date.substring(0, 7);
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  // 월요일을 시작 기준으로 그룹화
+  d.setUTCDate(d.getUTCDate() - day + (day === 0 ? -6 : 1));
+  return d.toISOString().split('T')[0];
+}
+
+/**
  * 일봉 데이터를 주봉 또는 월봉으로 집계합니다.
  * - 주봉: 월요일 시작 기준으로 그룹화
  * - 월봉: YYYY-MM 기준으로 그룹화
@@ -123,18 +138,7 @@ export function aggregateCandles(candles: Candle[], type: CandleType): Candle[] 
   let currentCandle: Candle | null = null;
 
   for (const c of candles) {
-    let key = '';
-    if (type === 'monthly') {
-      key = c.date.substring(0, 7); // "YYYY-MM"
-    } else {
-      // weekly
-      const d = new Date(c.date);
-      const day = d.getUTCDay();
-      // 월요일을 시작 기준으로 그룹화
-      const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
-      d.setUTCDate(diff);
-      key = d.toISOString().split('T')[0];
-    }
+    const key = candleGroupKey(c.date, type);
 
     if (key !== currentGroupKey) {
       if (currentCandle) result.push(currentCandle);

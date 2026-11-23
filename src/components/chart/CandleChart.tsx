@@ -4,12 +4,12 @@
  * TradingView Lightweight Charts를 래핑한 캔들스틱 차트 컴포넌트입니다.
  *
  * 구조:
- *   - Effect 1: 차트 인스턴스 생성 · 캔들/거래량/RSI/OBV 시리즈 세팅
+ *   - Effect 1: 차트 인스턴스 생성 · 캔들/거래량/RSI/OBV/공매도/신용잔고 시리즈 세팅
  *               패널 수나 테마가 바뀔 때만 재생성됨
  *   - Effect 2: MA·BB 오버레이만 교체 (차트 재생성 없이 시리즈만 swap)
  *
  * 패널 높이:
- *   각 서브 패널(거래량/RSI/OBV) 높이를 localStorage에 독립 저장하여
+ *   각 서브 패널(거래량/RSI/OBV/공매도/신용잔고) 높이를 localStorage에 독립 저장하여
  *   지표를 추가/제거해도 다른 패널 높이에 영향을 주지 않습니다.
  *
  * 모바일:
@@ -18,7 +18,9 @@
  *
  * Props:
  *   - candles     : OHLCV 캔들 데이터 배열
- *   - indicators  : 표시할 보조지표 옵션 (MA/BB/RSI/OBV/거래량/툴팁)
+ *   - indicators  : 표시할 보조지표 옵션 (MA/BB/RSI/OBV/거래량/공매도/신용잔고/툴팁)
+ *   - shortSales  : 공매도 패널 점(봉 날짜에 맞춘 것, lib/short-credit.ts)
+ *   - credit      : 신용잔고 패널 점(봉 날짜에 맞춘 것)
  *   - isDark      : 다크모드 여부 (차트 테마 색상 결정)
  *   - memos       : 날짜→메모 Map (툴팁에 메모 미리보기 표시)
  *   - onDateClick : 캔들 클릭 시 날짜 콜백 (메모 모달 열기용)
@@ -41,6 +43,7 @@ import {
 import { useEffect, useRef, useMemo, type RefObject } from 'react';
 import type { Candle } from '@/types/stock';
 import { calcMA, calcBB, calcRSI, calcOBV } from '@/lib/indicators';
+import type { ShortSalePoint, CreditPoint } from '@/lib/short-credit';
 
 export interface IndicatorOptions {
   volume: boolean;
@@ -48,6 +51,10 @@ export interface IndicatorOptions {
   bb: boolean;
   rsi: boolean;
   obv: boolean;
+  /** 공매도 체결 비중 패널 */
+  short: boolean;
+  /** 신용잔고율 패널 */
+  credit: boolean;
   tooltip: boolean;
 }
 
@@ -58,7 +65,12 @@ interface Props {
   memos?: Map<string, string>;
   onDateClick?: (date: string) => void;
   topInfoRef?: RefObject<HTMLDivElement | null>;
+  shortSales?: ShortSalePoint[];
+  credit?: CreditPoint[];
 }
+
+const NO_SHORT: ShortSalePoint[] = [];
+const NO_CREDIT: CreditPoint[] = [];
 
 function buildDefaultInfoHtml(): string {
   return (
@@ -94,11 +106,19 @@ const DEFAULT_SUB_H = 100; // 서브 패널 기본 높이
 
 // 서브 패널별 독립 키 — 추가/제거 시 다른 패널 높이에 영향 없음
 // 가격 패널 높이는 저장하지 않음 (항상 PANE_AREA - subTotal 로 계산)
+// 서브 패널은 이 객체의 키 순서대로 위에서 아래로 쌓인다
 const PANE_KEYS = {
   vol: 'pane-h-vol',
   rsi: 'pane-h-rsi',
   obv: 'pane-h-obv',
+  short: 'pane-h-short',
+  credit: 'pane-h-credit',
 } as const;
+type SubPane = keyof typeof PANE_KEYS;
+const SUB_PANES = Object.keys(PANE_KEYS) as SubPane[];
+
+const SHORT_COLOR  = '#f59e0b';
+const CREDIT_COLOR = '#f472b6';
 
 function loadPaneH(key: string, def: number): number {
   try {
@@ -118,11 +138,15 @@ const fmtObv = (p: number) => {
   if (a >= 1e3) return `${s}${(a / 1e3).toFixed(0)}K`;
   return `${s}${a}`;
 };
+const fmtPct = (p: number) => `${p.toFixed(2)}%`;
 function lineVal(seriesData: Map<ISeriesApi<'Line'>, unknown>, s: ISeriesApi<'Line'>): number | null {
   return (seriesData.get(s) as LineData | undefined)?.value ?? null;
 }
 
-export default function CandleChart({ candles, indicators, isDark, memos, onDateClick, topInfoRef }: Props) {
+export default function CandleChart({
+  candles, indicators, isDark, memos, onDateClick, topInfoRef,
+  shortSales = NO_SHORT, credit = NO_CREDIT,
+}: Props) {
   const wrapperRef      = useRef<HTMLDivElement>(null);
   const containerRef    = useRef<HTMLDivElement>(null);
   const tooltipRef      = useRef<HTMLDivElement>(null);
@@ -180,10 +204,6 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
     bbMid:   ISeriesApi<'Line'> | null;
     bbLower: ISeriesApi<'Line'> | null;
   }>({ ma: [], bbUpper: null, bbMid: null, bbLower: null });
-  // 각 보조지표 패널 좌상단 legend div
-  const legendsRef = useRef<{ vol: HTMLDivElement | null; rsi: HTMLDivElement | null; obv: HTMLDivElement | null }>
-    ({ vol: null, rsi: null, obv: null });
-
   // MA 배열을 stable 문자열로 변환 (effect dep용)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const maKey = useMemo(() => [...indicators.ma].sort((a, b) => a - b).join(','), [indicators.ma]);
@@ -202,20 +222,23 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
     const MIN_PRICE_H = 150;
     const PANE_AREA = CHART_HEIGHT - TIMESCALE_H;
 
+    // 켜진 서브 패널(쌓이는 순서대로). 차트 pane 인덱스는 active의 인덱스 + 1
+    const enabled: Record<SubPane, boolean> = {
+      vol: indicators.volume, rsi: indicators.rsi, obv: indicators.obv,
+      short: indicators.short, credit: indicators.credit,
+    };
+    const active = SUB_PANES.filter((k) => enabled[k]);
+
     // 각 서브 패널 높이를 독립적으로 불러옴
-    const rawVol = indicators.volume ? loadPaneH(PANE_KEYS.vol, DEFAULT_SUB_H) : 0;
-    const rawRsi = indicators.rsi    ? loadPaneH(PANE_KEYS.rsi, DEFAULT_SUB_H) : 0;
-    const rawObv = indicators.obv    ? loadPaneH(PANE_KEYS.obv, DEFAULT_SUB_H) : 0;
-    const rawSubTotal = rawVol + rawRsi + rawObv;
+    const rawH = active.map((k) => loadPaneH(PANE_KEYS[k], DEFAULT_SUB_H));
+    const rawSubTotal = rawH.reduce((a, b) => a + b, 0);
 
     // 서브 패널 합계가 허용 범위를 초과하면 비율에 맞게 스케일
     // → 합계가 항상 PANE_AREA와 일치해 lwc 내부 정규화가 발생하지 않음
     const maxSubH = PANE_AREA - MIN_PRICE_H;
     const scale   = rawSubTotal > maxSubH && rawSubTotal > 0 ? maxSubH / rawSubTotal : 1;
-    const volH    = Math.round(rawVol * scale);
-    const rsiH    = Math.round(rawRsi * scale);
-    const obvH    = Math.round(rawObv * scale);
-    const subTotal = volH + rsiH + obvH;
+    const subH    = rawH.map((h) => Math.round(h * scale));
+    const subTotal = subH.reduce((a, b) => a + b, 0);
 
     // 가격 패널 = 나머지 전부 (항상 >= MIN_PRICE_H, lwc 정규화 없음)
     const priceH = PANE_AREA - subTotal;
@@ -314,14 +337,34 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
         priceFormat: { type: 'custom', formatter: fmtObv, minMove: 1 },
       }, nextPane);
       obvS.setData(calcOBV(candles).map((d) => ({ time: d.time as Time, value: d.value })));
+      nextPane++;
+    }
+
+    // 공매도·신용잔고: 점은 봉 날짜에 맞춰 넘어온다. 데이터 없는 날은 점이 없다(0으로 채우지 않음)
+    const shortMap  = new Map(shortSales.map((p) => [p.time, p]));
+    const creditMap = new Map(credit.map((p) => [p.time, p]));
+
+    if (indicators.short) {
+      chart.addPane();
+      chart.addSeries(HistogramSeries, {
+        color: SHORT_COLOR + 'b3', priceLineVisible: false, lastValueVisible: true,
+        priceFormat: { type: 'custom', formatter: fmtPct, minMove: 0.01 },
+      }, nextPane).setData(shortSales.map((p) => ({ time: p.time as Time, value: p.ratio })));
+      nextPane++;
+    }
+
+    if (indicators.credit) {
+      chart.addPane();
+      chart.addSeries(LineSeries, {
+        color: CREDIT_COLOR, lineWidth: 1, priceLineVisible: false, lastValueVisible: true, crosshairMarkerVisible: true,
+        priceFormat: { type: 'custom', formatter: fmtPct, minMove: 0.01 },
+      }, nextPane).setData(credit.map((p) => ({ time: p.time as Time, value: p.rate })));
+      nextPane++;
     }
 
     // 각 패널 높이 개별 적용 (서브 패널이 서로의 크기에 영향을 주지 않음)
     chart.panes()[0].setHeight(priceH);
-    let pi = 1;
-    if (indicators.volume) { chart.panes()[pi++].setHeight(volH); }
-    if (indicators.rsi)    { chart.panes()[pi++].setHeight(rsiH); }
-    if (indicators.obv)    { chart.panes()[pi++].setHeight(obvH); }
+    active.forEach((_, i) => chart.panes()[i + 1]?.setHeight(subH[i]));
 
     // 보조지표 패널 좌상단 legend div — 래퍼 div에 직접 붙여 pane DOM 의존성 제거
     const mkLegend = (topY: number): HTMLDivElement => {
@@ -330,26 +373,43 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       wrapper.appendChild(d);
       return d;
     };
-    legendsRef.current.vol = indicators.volume ? mkLegend(priceH)                 : null;
-    legendsRef.current.rsi = indicators.rsi    ? mkLegend(priceH + volH)          : null;
-    legendsRef.current.obv = indicators.obv    ? mkLegend(priceH + volH + rsiH)   : null;
+    const legends: Partial<Record<SubPane, HTMLDivElement>> = {};
+    {
+      let y = priceH;
+      active.forEach((k, i) => { legends[k] = mkLegend(y); y += subH[i]; });
+    }
+
+    // 공매도·신용잔고 legend 문구 (점이 없으면 '-')
+    const shortLegend = (p: ShortSalePoint | undefined) =>
+      p
+        ? `공매도&nbsp;${p.volume !== null ? fmt(p.volume) : '-'}&nbsp;<span style="color:${SHORT_COLOR};font-weight:600">${fmtPct(p.ratio)}</span>`
+        : `공매도&nbsp;<span style="opacity:0.6">-</span>`;
+    const creditLegend = (p: CreditPoint | undefined) =>
+      p
+        ? `신용잔고율&nbsp;<span style="color:${CREDIT_COLOR};font-weight:600">${fmtPct(p.rate)}</span>${p.shares !== null ? `&nbsp;잔고&nbsp;${fmt(p.shares)}` : ''}`
+        : `신용잔고율&nbsp;<span style="opacity:0.6">-</span>`;
+    // 처음에는 마지막 점을 보여 준다(크로스헤어를 움직이면 그 봉 값으로 바뀜)
+    if (legends.short) legends.short.innerHTML = shortLegend(shortSales[shortSales.length - 1]);
+    if (legends.credit) legends.credit.innerHTML = creditLegend(credit[credit.length - 1]);
 
     // 패널 드래그 / 리사이즈 후 legend top 위치 재계산
     const repositionLegends = () => {
       const panes = chart.panes();
       let cumY = panes[0].getHeight();
-      let pi = 1;
-      if (legendsRef.current.vol) {
-        legendsRef.current.vol.style.top = `${cumY + 4}px`;
-        cumY += panes[pi++]?.getHeight() ?? 0;
-      }
-      if (legendsRef.current.rsi) {
-        legendsRef.current.rsi.style.top = `${cumY + 4}px`;
-        cumY += panes[pi++]?.getHeight() ?? 0;
-      }
-      if (legendsRef.current.obv) {
-        legendsRef.current.obv.style.top = `${cumY + 4}px`;
-      }
+      active.forEach((k, i) => {
+        const lg = legends[k];
+        if (lg) lg.style.top = `${cumY + 4}px`;
+        cumY += panes[i + 1]?.getHeight() ?? 0;
+      });
+    };
+
+    // 켜진 서브 패널 높이를 각자 키로 저장
+    const saveSubHeights = () => {
+      const panes = chart.panes();
+      active.forEach((k, i) => {
+        const p = panes[i + 1];
+        if (p) savePaneH(PANE_KEYS[k], p.getHeight());
+      });
     };
 
     if (candles.length > 60) {
@@ -398,20 +458,22 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
 
       // ── 보조지표 패널 legend 업데이트 (항상 실행) ─────────────────────────────
       const sd = param.seriesData as Map<ISeriesApi<'Line'>, unknown>;
-      if (legendsRef.current.vol) {
-        legendsRef.current.vol.textContent = `거래량 ${fmt(candle.volume)}`;
+      if (legends.vol) {
+        legends.vol.textContent = `거래량 ${fmt(candle.volume)}`;
       }
-      if (rsiS && legendsRef.current.rsi) {
+      if (rsiS && legends.rsi) {
         const v = lineVal(sd, rsiS);
         if (v !== null) {
           const rc = v >= 70 ? '#ef4444' : v <= 30 ? '#3b82f6' : '#a78bfa';
-          legendsRef.current.rsi.innerHTML = `RSI&nbsp;<span style="color:${rc};font-weight:600">${v.toFixed(2)}</span>`;
+          legends.rsi.innerHTML = `RSI&nbsp;<span style="color:${rc};font-weight:600">${v.toFixed(2)}</span>`;
         }
       }
-      if (obvS && legendsRef.current.obv) {
+      if (obvS && legends.obv) {
         const v = lineVal(sd, obvS);
-        if (v !== null) legendsRef.current.obv.textContent = `OBV ${fmtObv(v)}`;
+        if (v !== null) legends.obv.textContent = `OBV ${fmtObv(v)}`;
       }
+      if (legends.short)  legends.short.innerHTML  = shortLegend(shortMap.get(candle.date));
+      if (legends.credit) legends.credit.innerHTML = creditLegend(creditMap.get(candle.date));
 
       const isUp = candle.close >= candle.open;
       const up = '#ef4444', dn = '#3b82f6', cl = isUp ? up : dn;
@@ -641,13 +703,7 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
 
       if (lpTimer) { clearTimeout(lpTimer); lpTimer = null; }
 
-      if (sepState === 'dragging') {
-        const panes = chart.panes();
-        let pi = 1;
-        if (indicators.volume) savePaneH(PANE_KEYS.vol, panes[pi++].getHeight());
-        if (indicators.rsi)    savePaneH(PANE_KEYS.rsi, panes[pi++].getHeight());
-        if (indicators.obv)    savePaneH(PANE_KEYS.obv, panes[pi++].getHeight());
-      }
+      if (sepState === 'dragging') saveSubHeights();
       sepState = 'idle'; sepIdx = -1;
     };
 
@@ -668,13 +724,9 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
       el.removeEventListener('touchend',   onSepEnd);
       if (lpTimer) clearTimeout(lpTimer);
       // 패널 legend 제거
-      [legendsRef.current.vol, legendsRef.current.rsi, legendsRef.current.obv].forEach(el => el?.remove());
-      legendsRef.current = { vol: null, rsi: null, obv: null };
+      Object.values(legends).forEach(lg => lg?.remove());
       // 서브 패널 높이만 저장 (가격 패널은 항상 나머지로 계산)
-      let si = 1;
-      if (indicators.volume) savePaneH(PANE_KEYS.vol, chart.panes()[si++].getHeight());
-      if (indicators.rsi)    savePaneH(PANE_KEYS.rsi, chart.panes()[si++].getHeight());
-      if (indicators.obv)    savePaneH(PANE_KEYS.obv, chart.panes()[si++].getHeight());
+      saveSubHeights();
       ro.disconnect();
       chart.remove();
       chartRef.current        = null;
@@ -683,7 +735,7 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
     };
   // MA·BB는 이 effect의 dep에서 제외 → 오버레이 변경 시 차트 재생성 없음
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, isDark, indicators.volume, indicators.rsi, indicators.obv]);
+  }, [candles, isDark, indicators.volume, indicators.rsi, indicators.obv, indicators.short, indicators.credit, shortSales, credit]);
 
   // ── Effect 2: 오버레이 시리즈만 교체 (차트 재생성 없음) ─────────────────────
 
@@ -728,7 +780,7 @@ export default function CandleChart({ candles, indicators, isDark, memos, onDate
   // Effect 1의 deps를 모두 포함 → Effect 1이 차트를 재생성하면 Effect 2도 반드시 실행
   // + maKey, bb → MA/BB만 바뀔 때는 Effect 2만 실행 (차트 재생성 없음)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candles, isDark, indicators.volume, indicators.rsi, indicators.obv, maKey, indicators.bb]);
+  }, [candles, isDark, indicators.volume, indicators.rsi, indicators.obv, indicators.short, indicators.credit, shortSales, credit, maKey, indicators.bb]);
 
   return (
     <div ref={wrapperRef} className="relative w-full h-[450px] md:h-[590px]">

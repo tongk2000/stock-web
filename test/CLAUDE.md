@@ -14,6 +14,7 @@
 | --- | --- | --- |
 | 금액·퍼센트·상대 시각 표기를 고친다 | `lib/format.test.ts`의 `formatKRWCompact`, `formatRelativeTime` | 소스 `src/lib/format.ts` |
 | 보조지표나 주봉·월봉 묶기를 고친다 | `lib/indicators.test.ts`의 `aggregateCandles`, `calcRSI` | 소스 `src/lib/indicators.ts` |
+| 차트 공매도·신용잔고 점 집계를 고친다 | `lib/short-credit.test.ts`의 `alignShortSales`, `alignCreditBalances`, `candleGroupKey` | 소스 `src/lib/short-credit.ts` |
 | Naver 응답 문자열 파싱을 고친다 | `lib/parsers.test.ts`의 `parseKrwAmount`, `parseInt0` | 소스 `src/lib/parsers.ts` |
 | KST 날짜·주말 판정을 고친다 | `lib/time.test.ts`의 `kstToday`, `isKstWeekend` | 소스 `src/lib/time.ts` |
 | 종목코드 검증을 고친다 | `lib/naver.test.ts`의 `isStockCode` | 소스 `src/lib/naver.ts` |
@@ -44,6 +45,7 @@
 | `indicators.test.ts` | 이동평균·볼린저밴드·RSI·OBV, 일봉의 주봉·월봉 집계(주·월·연 경계) |
 | `naver.test.ts` | 종목코드 6자리 검증(`isStockCode`) |
 | `parsers.test.ts` | Naver 응답 문자열의 정수·실수·소수·원화 단위 파싱 |
+| `short-credit.test.ts` | 공매도·신용잔고 행 정규화(문자열 numeric), 일·주·월봉 점 맞추기(빈 날, null, 거래량 0), 주봉 묶음 키 |
 | `time.test.ts` | KST 날짜·주말 판정(자정 경계), 체결일 문자열 정리 |
 
 ### `lib/supabase/`

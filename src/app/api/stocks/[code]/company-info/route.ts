@@ -129,6 +129,7 @@ export async function GET(
     stockRes,
     financialsRes,
     candlesRes,
+    creditRes,
     naver,
   ] = await Promise.all([
     supabase
@@ -150,6 +151,14 @@ export async function GET(
       .order('date', { ascending: false })
       .limit(252)
       .returns<CandleRow[]>(),
+    // 신용잔고율은 KIS 일별 신용잔고(collect_kis_flows.py)의 최신 매매일 값
+    supabase
+      .from('credit_balances')
+      .select('loan_balance_rate')
+      .eq('stock_code', code)
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle<{ loan_balance_rate: number | null }>(),
     fetchNaverSupplement(code),
   ]);
 
@@ -201,7 +210,7 @@ export async function GET(
     ev_ebitda: financials?.ev_ebitda ?? null,
     dividend: financials?.dividend ?? naver?.dividend ?? null,
     dividend_yield: financials?.dividend_yield ?? naver?.dividend_yield ?? null,
-    credit_balance_ratio: financials?.credit_balance_ratio ?? null,
+    credit_balance_ratio: creditRes.data?.loan_balance_rate ?? financials?.credit_balance_ratio ?? null,
     high_5d: maxHigh(candles.slice(0, 5)),
     low_5d: minLow(candles.slice(0, 5)),
     high_20d: maxHigh(lookback20),

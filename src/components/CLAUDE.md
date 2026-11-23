@@ -14,7 +14,7 @@
 | `ui/` | shadcn(`button.tsx`). import하는 곳 없음 |
 | `theme-provider.tsx` | 테마 Provider와 `useTheme` |
 
-화면만 맡는다. 조회·계산은 `src/lib/`, 전역 상태는 `src/contexts/`, 훅은 `src/hooks/`, 라우트·API는 `src/app/`. 큰 파일(`CandleChart.tsx` 743줄, `StockChartSection.tsx` 557줄, `DiscussionSection.tsx` 435줄, `CommentSection.tsx` 350줄, `LeftNav.tsx` 319줄)은 통째로 읽지 말고 `python3 docs/outline.py <파일>`로 범위를 본다.
+화면만 맡는다. 조회·계산은 `src/lib/`, 전역 상태는 `src/contexts/`, 훅은 `src/hooks/`, 라우트·API는 `src/app/`. 큰 파일(`CandleChart.tsx` 795줄, `StockChartSection.tsx` 625줄, `DiscussionSection.tsx` 435줄, `CommentSection.tsx` 350줄, `LeftNav.tsx` 319줄)은 통째로 읽지 말고 `python3 docs/outline.py <파일>`로 범위를 본다.
 
 ## 어디를 볼까
 
@@ -25,8 +25,9 @@
 | 기업정보 탭, 탭 공용 표시 | `stock/CompanyInfoSection.tsx`(자체 `fetch`), `stock/TabStatus.tsx` `toneClass`, `signed` | `/api/stocks/[code]/company-info` |
 | 차트 데이터(거래소, 일·주·월봉) | `stock/StockChartSection.tsx` `EXCHANGES`, `CANDLE_TYPES`, `fetchCandles`, `mergeCandles`, `candles` | `lib/indicators.ts` `aggregateCandles` |
 | 오늘 봉 | `stock/StockChartSection.tsx` `allCandlesWithToday`, `isLiveCandle` | `hooks/useTodayCandle.ts` `useTodayCandle`, `isMarketOpen` |
-| 이평선·BB·RSI·OBV·거래량·툴팁 설정 | `stock/StockChartSection.tsx` `DEFAULT_INDICATORS`, `loadIndicators`, `toggleMA`, `toggleFlag` | `STORAGE_KEYS.INDICATORS` |
-| 차트 그리기(패널 높이, 색, 툴팁) | `chart/CandleChart.tsx` `IndicatorOptions`, `PANE_KEYS`, `loadPaneH`, `CHART_COLORS`, `MA_COLORS`, `lineVal`, `overlayRef`, `maKey` | `StockChartSection`에도 `MA_COLORS`가 또 있다 |
+| 이평선·BB·RSI·OBV·거래량·공매도·신용·툴팁 설정 | `stock/StockChartSection.tsx` `DEFAULT_INDICATORS`, `loadIndicators`, `toggleMA`, `toggleFlag` | `STORAGE_KEYS.INDICATORS`. 저장된 옛 설정은 `DEFAULT_INDICATORS`와 병합 |
+| 공매도·신용잔고 패널 데이터 | `stock/StockChartSection.tsx` `shortRows`, `creditRows`, `shortPoints`, `creditPoints` | `short_sales`, `credit_balances` 테이블(패널이 켜졌을 때만 종목별로 읽음), `lib/short-credit.ts` `alignShortSales`, `alignCreditBalances` |
+| 차트 그리기(패널 높이, 색, 툴팁, 패널 legend) | `chart/CandleChart.tsx` `IndicatorOptions`, `PANE_KEYS`, `SUB_PANES`, `saveSubHeights`, `shortLegend`, `creditLegend`, `loadPaneH`, `CHART_COLORS`, `MA_COLORS`, `lineVal`, `overlayRef`, `maKey` | `StockChartSection`에도 `MA_COLORS`가 또 있다 |
 | 차트 모바일 제스처(핀치 차단, 패널 롱프레스 드래그) | `chart/CandleChart.tsx` `blockPinch`, `getSepYs`, `onSepStart`, `onSepMove`, `onSepEnd` | |
 | 차트 메모(모달, 저장·삭제) | `stock/StockChartSection.tsx` `handleDateClick`, `saveMemo`, `deleteMemo`, `memoRecord`, `selectedDate` | `chart_memos` 테이블. 날짜는 `CandleChart`의 `hoveredDateRef` |
 | 토론방(작성, 무한 스크롤, 실시간) | `discussion/DiscussionSection.tsx` `POST_SELECT`, `loadMore`, `handleSubmit`, `handleDelete` | `PAGE_SIZE.ROOM`, 채널 `room:<roomId>` |
@@ -44,7 +45,7 @@
 - 구독은 `useEffect` cleanup에서 `supabase.removeChannel(channel)`로 푼다(세 곳 모두). 새 구독도 같이 한다. 빠지면 채널이 쌓인다.
 - 차트 흐름: `StockChartSection`이 `candles` 테이블 일봉을 읽는다. `통합`은 KRX·NXT를 `mergeCandles`로 합치고(KRX 날짜 기준, 거래량 합, 시가·종가는 KRX), `KRX`는 그대로 쓴다. NXT 버튼은 `disabled`('준비 중')다. 오늘 봉을 얹고 `aggregateCandles`로 주·월봉을 만들어 `CandleChart`에 넘긴다.
 - `CandleChart`는 `dynamic(..., { ssr: false })`로 부른다. 마운트 뒤 `clientHeight`·`window`·localStorage를 읽는 effect에서 `createChart`를 하기 때문이다(이유 주석은 없다). 자리표시자 높이를 `CandleChart` 래퍼(`h-[450px] md:h-[590px]`)와 맞춘다.
-- `CandleChart` effect 하나는 `candles`·`isDark`·거래량·RSI·OBV가 바뀌면 차트를 지우고 다시 만든다(범위는 최근 60봉으로 돌아간다). 다른 하나는 MA·BB만 바꾼다. 그래서 `onDateClick`·`memos`는 `onDateClickRef`·`memosRef`로 읽는다. 핸들러에서 새 prop을 쓰려면 같은 식으로 ref를 거친다. 장중 `useTodayCandle`이 30초마다 새 객체를 줘서 그때마다 다시 만들어질 것으로 읽힌다(실행 확인 못 함).
+- `CandleChart` effect 하나는 `candles`·`isDark`·거래량·RSI·OBV·공매도·신용(토글과 점 배열)이 바뀌면 차트를 지우고 다시 만든다(범위는 최근 60봉으로 돌아간다). 다른 하나는 MA·BB만 바꾼다. 그래서 `onDateClick`·`memos`는 `onDateClickRef`·`memosRef`로 읽는다. 핸들러에서 새 prop을 쓰려면 같은 식으로 ref를 거친다. 장중 `useTodayCandle`이 30초마다 새 객체를 줘서 그때마다 다시 만들어질 것으로 읽힌다(실행 확인 못 함).
 - 낙관적 업데이트는 되돌리지 않는다. 메모(`saveMemo`, `deleteMemo`), 좋아요·싫어요, 글·댓글 삭제는 화면을 먼저 바꾸고 응답 `error`를 보지 않는다. 새 낙관적 업데이트는 실패하면 되돌린다. 좋아요·싫어요 규칙(배타, 본인 글 막기)이 `DiscussionSection`과 `PostLikeButtons`에 따로 있어 한쪽을 고치면 다른 쪽도 본다.
 - 스타일링: Tailwind v4 + shadcn/ui, `tailwind.config` 없음(CSS 우선, `app/globals.css`). 클래스는 `cn()`(`@/lib/utils`)으로 합친다. 다크 모드는 `<html class="dark">`이고 `ThemeProvider`(`theme-provider.tsx`)에 맡긴다. 직접 `classList`를 만지지 않는다.
 - FOUC(테마 깜빡임) 방지는 `app/layout.tsx`의 `<head>` 인라인 스크립트 몫이다. `ThemeProvider`는 하이드레이션 뒤의 토글·저장만 한다. 스크립트가 `STORAGE_KEYS.THEME`을 주입하니 그 값을 바꾸지 않는다([lib 안내](../lib/CLAUDE.md)).
@@ -64,7 +65,7 @@
 
 | 파일 | 내용 |
 | --- | --- |
-| `CandleChart.tsx` | 캔들 차트: 거래량·RSI·OBV 패널, MA·BB 오버레이, 툴팁, 모바일 제스처 |
+| `CandleChart.tsx` | 캔들 차트: 거래량·RSI·OBV·공매도 비중·신용잔고율 패널(`PANE_KEYS` 순서로 쌓임), MA·BB 오버레이, 툴팁, 모바일 제스처 |
 
 ### `discussion/`
 
@@ -106,7 +107,7 @@
 | `QuoteSection.tsx` | 시세 탭(최근 20영업일) |
 | `RankingTable.tsx` | 랭킹 공용 표, 행 타입 `RankingTableRow` |
 | `RankingTabs.tsx` | `?tab=` 링크 탭 |
-| `StockChartSection.tsx` | 차트 영역: 현재가, 거래소·봉 탭, 지표 설정, 메모 모달 |
+| `StockChartSection.tsx` | 차트 영역: 현재가, 거래소·봉 탭, 지표 설정, 공매도·신용잔고 조회, 메모 모달 |
 | `StockDetailTabs.tsx` | 종목 상세 하단 탭 컨테이너 |
 | `StockSearch.tsx` | 헤더·하단바 검색 입력 |
 | `TabStatus.tsx` | 탭의 로딩·에러·빈 상태, `toneClass`, `signed` |

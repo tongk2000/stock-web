@@ -25,3 +25,23 @@ export type Candle = {
 
 /** 캔들 집계 단위 */
 export type CandleType = "daily" | "weekly" | "monthly";
+
+/** short_sales 테이블 — 일별 공매도 체결(KRX 정규장 기준). numeric 열은 PostgREST가 문자열로 줄 수 있어 읽을 때 Number로 바꾼다 */
+export type ShortSale = {
+  date: string;                       // YYYY-MM-DD
+  short_volume: number | null;        // 공매도 체결 수량(주)
+  short_value: number | null;         // 공매도 거래대금(원)
+  short_volume_ratio: number | null;  // 거래량 대비 공매도 비중(%)
+  short_value_ratio: number | null;   // 거래대금 대비 공매도 비중(%)
+};
+
+/** credit_balances 테이블 — 일별 신용잔고(date는 매매일, 결제일 기준 공시라 최근 2영업일은 없다) */
+export type CreditBalance = {
+  date: string;                        // YYYY-MM-DD
+  loan_balance_shares: number | null;  // 융자 잔고 수량(주)
+  loan_balance_amount: number | null;  // 융자 잔고 금액(원)
+  loan_balance_rate: number | null;    // 신용잔고율(상장주식수 대비 %)
+  loan_new_shares: number | null;      // 융자 신규 수량
+  loan_repay_shares: number | null;    // 융자 상환 수량
+  lend_balance_shares: number | null;  // 대주 잔고 수량
+};

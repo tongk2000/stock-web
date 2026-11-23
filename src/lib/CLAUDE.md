@@ -9,7 +9,7 @@
 | 구분 | 파일 | 서버 전용? |
 | --- | --- | --- |
 | 라이브러리 어댑터 | `supabase/client.ts`, `supabase/server.ts`, `supabase/normalize.ts`, `query-client.ts`(TanStack Query), `utils.ts`(`cn`) | `supabase/server.ts`만(`next/headers`) |
-| 순수 유틸 | `format.ts`, `indicators.ts`, `parsers.ts`, `time.ts` | 아니다 |
+| 순수 유틸 | `format.ts`, `indicators.ts`, `short-credit.ts`, `parsers.ts`, `time.ts` | 아니다 |
 | 상수 | `constants.ts` | 아니다 |
 | 서버 전용 조회 | `rankings.ts`(`supabase/server`), `market.ts`(`next/cache`) | 그렇다. 클라이언트 컴포넌트에서 import하지 않는다 |
 | 외부 호출 | `naver.ts`(네이버 증권, Route Handler에서만), `post-reactions.ts`(클라이언트를 인자로 받는 좋아요 쓰기) | `naver.ts`는 서버 |
@@ -30,7 +30,8 @@ TanStack Query는 `components/layout/query-provider.tsx`가 `QueryClientProvider
 | 상대 시간·원화 축약·퍼센트·천단위 | `format.ts` `formatRelativeTime`, `formatKRWCompact`, `formatPercent`, `formatNumber` | 값이 없으면 `-` |
 | KST 날짜·요일, 네이버 날짜 문자열 | `time.ts` `kstNow`, `kstToday`, `isKstWeekend`, `parseTradeDate` | '지킬 것' |
 | 이평선·볼린저·RSI·OBV | `indicators.ts` `calcMA`, `calcBB`, `calcRSI`, `calcOBV` | `components/chart/CandleChart.tsx` |
-| 일봉을 주·월봉으로 묶기 | `indicators.ts` `aggregateCandles` | `mergeCandles`는 이 폴더가 아니라 `components/stock/StockChartSection.tsx` 안에 있다 |
+| 일봉을 주·월봉으로 묶기 | `indicators.ts` `aggregateCandles`, `candleGroupKey` | `mergeCandles`는 이 폴더가 아니라 `components/stock/StockChartSection.tsx` 안에 있다 |
+| 차트 공매도·신용잔고 점(정규화, 주·월봉 집계) | `short-credit.ts` `normalizeShortSales`, `normalizeCreditBalances`, `alignShortSales`, `alignCreditBalances`, `toNum` | 주·월봉 공매도 비중 = 기간 합계 수량 ÷ 봉 거래량(통합 모드는 합산 거래량이 분모), 신용잔고율 = 기간 마지막 값 |
 | 랭킹: 거래대금·거래량 급증 | `rankings.ts` `getVolumeRanking` | 뷰 `v_daily_change`, `v_volume_surge` |
 | 랭킹: 등락률, 52주 신고·신저가 | `rankings.ts` `getMoversRanking` | 뷰 `v_daily_change`, `v_52w_extremes` |
 | 랭킹: 토론 핫 종목 | `rankings.ts` `getTrendingRanking` | `posts`를 24시간 창으로 집계. 점수 = 글 수 + 좋아요 x 0.5 |
@@ -43,7 +44,7 @@ TanStack Query는 `components/layout/query-provider.tsx`가 `QueryClientProvider
 | 좋아요·싫어요 행 쓰기 | `post-reactions.ts` `addReaction`, `removeReaction` | `discussion/DiscussionSection.tsx`, `PostLikeButtons.tsx`. 토글 규칙은 호출부 |
 | Supabase 클라이언트, 조인 결과 정규화 | `supabase/server.ts` `createClient`, `supabase/client.ts` `createClient`, `supabase/normalize.ts` `firstOrNull` | '지킬 것' |
 
-테스트는 test/lib/<이름>.test.ts에 있다: constants, format, indicators, naver, parsers, time, supabase/normalize. 아직 없는 것은 `rankings.ts`, `market.ts`, `post-reactions.ts`, `query-client.ts`, `utils.ts`, `supabase/client.ts`, `supabase/server.ts`다. 순수 함수를 고치면 그 테스트도 고친다.
+테스트는 test/lib/<이름>.test.ts에 있다: constants, format, indicators, naver, parsers, short-credit, time, supabase/normalize. 아직 없는 것은 `rankings.ts`, `market.ts`, `post-reactions.ts`, `query-client.ts`, `utils.ts`, `supabase/client.ts`, `supabase/server.ts`다. 순수 함수를 고치면 그 테스트도 고친다.
 
 ## 지킬 것
 
@@ -66,13 +67,14 @@ TanStack Query는 `components/layout/query-provider.tsx`가 `QueryClientProvider
 | --- | --- |
 | `constants.ts` | 전역 상수: `PAGE_SIZE`, `ENGAGEMENT_THRESHOLD`, `STORAGE_KEYS`, `MA_PERIODS`, `RANKING`, `LIMITS`, `LIVE_CANDLE_POLL_MS` |
 | `format.ts` | 표시 포맷: 상대 시간, 원화 축약(만·억·조), 부호 퍼센트, 천단위 |
-| `indicators.ts` | 순수 지표 계산(MA, 볼린저, RSI, OBV)과 `aggregateCandles` |
+| `indicators.ts` | 순수 지표 계산(MA, 볼린저, RSI, OBV)과 `aggregateCandles`, 묶음 키 `candleGroupKey` |
 | `market.ts` | 서버 전용. KRX 영업일 판정 `getIsTradingDay`(`unstable_cache` 1시간). 호출처 없음 |
 | `naver.ts` | 서버 전용. 네이버 모바일 증권 JSON 호출 `fetchNaverJson`(3초 타임아웃, 실패는 `null`), 종목코드 검사 |
 | `parsers.ts` | 네이버 응답 문자열 파싱: 정수, 실수, 조·억 금액, 값 없음은 `null` |
 | `post-reactions.ts` | 좋아요·싫어요 행 추가·삭제. 카운트는 DB 트리거가 올린다 |
 | `query-client.ts` | TanStack `QueryClient` 생성. 서버는 매번 새로, 브라우저는 싱글톤 |
 | `rankings.ts` | 서버 전용. 랭킹 페이지용 조회 7종이 `RankingTableRow[]`(섹터 순위는 `SectorRankingRow[]`)를 돌려준다 |
+| `short-credit.ts` | 차트 공매도·신용잔고 패널용: DB 행 숫자 정규화, 봉 날짜에 맞춘 점(주·월봉 집계) |
 | `time.ts` | KST 헬퍼(`kstNow`, `kstToday`, `isKstWeekend`)와 `parseTradeDate` |
 | `utils.ts` | `cn`(clsx + tailwind-merge) |
 

@@ -25,7 +25,7 @@ App Router의 라우트다. 페이지(`page.tsx`)는 서버 컴포넌트가 기�
 | 로그인 콜백·복귀·닉네임(주소 auth/callback, auth/return, auth/setup) | `auth/callback/route.ts`의 `GET`, `auth/return/page.tsx`의 `AuthReturnPage`, `auth/setup/page.tsx`의 `SetupPage`, `consumeNextPath` | '지킬 것'의 인증 흐름 |
 | 여러 종목 오늘 시세(Naver 직접) | `api/stock/today/route.ts`의 `GET`, `fetchPrice` | Naver basic, `LIMITS.BATCH_PRICE_CODES`. 쓰는 곳 `FavoriteStockPrices` |
 | 한 종목 오늘 캔들(Naver 직접) | `api/stock/today/[code]/route.ts`의 `GET`, `getInfoNum`, `parseTradeDateOrToday` | Naver basic과 integration. 쓰는 곳 `useTodayCandle` |
-| 기업정보 탭(Supabase + Naver 보강) | `api/stocks/[code]/company-info/route.ts`의 `GET`, `fetchNaverSupplement`, `okData` | stocks, v_latest_financials, candles |
+| 기업정보 탭(Supabase + Naver 보강) | `api/stocks/[code]/company-info/route.ts`의 `GET`, `fetchNaverSupplement`, `okData` | stocks, v_latest_financials, candles, credit_balances(신용잔고비율) |
 | 시세·수급·뉴스·공시 탭(Naver 프록시) | `api/stocks/[code]/quote/route.ts`, `api/stocks/[code]/flow/route.ts`, `api/stocks/[code]/news/route.ts`, `api/stocks/[code]/disclosures/route.ts`의 `GET` | `lib/naver.ts`의 `fetchNaverJson`, `isStockCode`. 쓰는 곳 `useStockTabData` |
 | 색인 기준, 사이트맵, robots | `constants.ts`의 `ENGAGEMENT_THRESHOLD`, `sitemap.ts`의 `sitemap`, `robots.ts`의 `robots` | 글 상세 `isIndexable`과 같은 상수 |
 | Provider 순서, 테마 스크립트, 기본 메타데이터 | `layout.tsx`의 `RootLayout`, `scriptStr`, `metadata` | '지킬 것' |
@@ -75,7 +75,7 @@ App Router의 라우트다. 페이지(`page.tsx`)는 서버 컴포넌트가 기�
 
 | 파일 | 내용 |
 | --- | --- |
-| `route.ts` | `GET`. 기업정보 탭: stocks 메타, v_latest_financials, KRX 일봉 252개(5·20일·52주 고저), Naver integration 보강 |
+| `route.ts` | `GET`. 기업정보 탭: stocks 메타, v_latest_financials, KRX 일봉 252개(5·20일·52주 고저), credit_balances 최신 신용잔고율, Naver integration 보강 |
 
 ### `api/stocks/[code]/disclosures/`
 

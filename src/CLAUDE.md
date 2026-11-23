@@ -36,7 +36,7 @@
 | 스크롤 방향으로 헤더·하단바 숨김 | `hooks/useScrollAtTop.ts`의 `useScrollAtTop` | 쓰는 곳 `AppHeader`, `BottomBar`, `LeftNav` |
 | 종목 상세 탭이 API 데이터를 불러온다 | `hooks/useStockTabData.ts`의 `useStockTabData` | `/api/stocks/[code]/{quote,flow,news,disclosures}`, [app 안내](app/CLAUDE.md) |
 | 오늘 캔들을 폴링한다, 장중 여부 | `hooks/useTodayCandle.ts`의 `useTodayCandle`, `isMarketOpen` | `/api/stock/today/[code]`, 주기 `LIVE_CANDLE_POLL_MS`(`lib/constants.ts`) |
-| 종목·캔들 타입 | `types/stock.ts`의 `Stock`, `Candle`, `CandleType` | stocks, candles 테이블 |
+| 종목·캔들 타입 | `types/stock.ts`의 `Stock`, `Candle`, `CandleType`, `ShortSale`, `CreditBalance` | stocks, candles, short_sales, credit_balances 테이블 |
 | 랭킹 행·탭 타입 | `types/ranking.ts`의 `RankingRow`, `DailyChangeRow`, `LatestFinancialsRow`, `ExtremesRow`, `ValuationTab`, `MoversTab`, `VolumeTab` | 뷰 v_daily_change, v_latest_financials, v_52w_extremes |
 | 토론 타입 | `types/discussion.ts`의 `Post`, `DiscussionRoom` | posts, discussion_rooms 테이블. 지금 import하는 곳 없음 |
 | 스토리지 키·상수를 바꾼다 | `lib/constants.ts`의 `STORAGE_KEYS` | [lib 안내](lib/CLAUDE.md) |
@@ -83,4 +83,4 @@
 | --- | --- |
 | `discussion.ts` | `Post`(posts 테이블), `DiscussionRoom`(discussion_rooms 테이블). 현재 import하는 곳 없음. `Post`에 `dislike_count`·`comment_count`는 없다 |
 | `ranking.ts` | 랭킹 행(`RankingRow`), 뷰 행(`DailyChangeRow`=v_daily_change, `LatestFinancialsRow`=v_latest_financials, `ExtremesRow`=v_52w_extremes), 탭 값(`ValuationTab`·`MoversTab`·`VolumeTab`) |
-| `stock.ts` | `Stock`(stocks 테이블), `Candle`(candles 테이블의 OHLCV), `CandleType`(`daily`·`weekly`·`monthly`). `Stock.current_price`·`change_rate`는 "미구현" 주석 |
+| `stock.ts` | `Stock`(stocks 테이블), `Candle`(candles 테이블의 OHLCV), `CandleType`(`daily`·`weekly`·`monthly`), `ShortSale`(short_sales), `CreditBalance`(credit_balances). `Stock.current_price`·`change_rate`는 "미구현" 주석 |

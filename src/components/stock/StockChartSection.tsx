@@ -13,6 +13,8 @@
  *   - Supabase에서 일봉(KRX/NXT) fetch → 통합 시 mergeCandles로 합산
  *   - 봉 타입 변경 시 aggregateCandles로 주봉/월봉 집계
  *   - 보조지표 설정은 localStorage에 저장/복원 (hydration 불일치 방지)
+ *   - 공매도(short_sales)·신용잔고(credit_balances)는 그 패널이 켜졌을 때만 종목별로 읽고,
+ *     lib/short-credit.ts로 봉 날짜에 맞춰 CandleChart에 넘긴다
  *
  * 메모:
  *   - 로그인 유저만 차트 날짜 클릭으로 메모 작성 가능
@@ -30,9 +32,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { useIsDark } from '@/hooks/useIsDark';
 import { aggregateCandles } from '@/lib/indicators';
+import {
+  alignCreditBalances, alignShortSales, normalizeCreditBalances, normalizeShortSales,
+} from '@/lib/short-credit';
 import { STORAGE_KEYS, MA_PERIODS } from '@/lib/constants';
 import { useTodayCandle, isMarketOpen } from '@/hooks/useTodayCandle';
-import type { Candle, CandleType } from '@/types/stock';
+import type { Candle, CandleType, CreditBalance, ShortSale } from '@/types/stock';
 import type { IndicatorOptions } from '@/components/chart/CandleChart';
 
 const CandleChart = dynamic(() => import('@/components/chart/CandleChart'), {
@@ -64,6 +69,8 @@ const DEFAULT_INDICATORS: IndicatorOptions = {
   bb: false,
   rsi: false,
   obv: false,
+  short: false,
+  credit: false,
   tooltip: true,
 };
 
@@ -157,6 +164,9 @@ export default function StockChartSection({ code }: Props) {
   const candles = useMemo(() => aggregateCandles(allCandlesWithToday, candleType), [allCandlesWithToday, candleType]);
 
   const [loading, setLoading] = useState(true);
+  // 공매도·신용잔고 행. 종목이 바뀌면 옛 종목 행을 쓰지 않도록 code를 같이 둔다
+  const [shortRows, setShortRows] = useState<{ code: string; rows: ShortSale[] } | null>(null);
+  const [creditRows, setCreditRows] = useState<{ code: string; rows: CreditBalance[] } | null>(null);
   const [indicators, setIndicators] = useState<IndicatorOptions>(DEFAULT_INDICATORS);
   const [showIndicators, setShowIndicators] = useState(false);
   // localStorage 복원이 완료됐는지 추적 — 복원 전에 DEFAULT로 덮어쓰는 것을 방지
@@ -252,6 +262,52 @@ export default function StockChartSection({ code }: Props) {
 
     fetchCandles();
   }, [code, exchange]);
+
+  // 공매도 행 fetch — 패널이 켜졌을 때만, 종목마다 한 번 (최대 약 1년치라 PostgREST 1000행 제한 안)
+  useEffect(() => {
+    if (!indicators.short || shortRows?.code === code) return;
+    let cancelled = false;
+    createClient()
+      .from('short_sales')
+      .select('date, short_volume, short_value, short_volume_ratio, short_value_ratio')
+      .eq('stock_code', code)
+      .order('date', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setShortRows({ code, rows: error || !data ? [] : normalizeShortSales(data) });
+      });
+    return () => { cancelled = true; };
+  }, [code, indicators.short, shortRows?.code]);
+
+  // 신용잔고 행 fetch — 패널이 켜졌을 때만, 종목마다 한 번
+  useEffect(() => {
+    if (!indicators.credit || creditRows?.code === code) return;
+    let cancelled = false;
+    createClient()
+      .from('credit_balances')
+      .select('date, loan_balance_shares, loan_balance_amount, loan_balance_rate, loan_new_shares, loan_repay_shares, lend_balance_shares')
+      .eq('stock_code', code)
+      .order('date', { ascending: true })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setCreditRows({ code, rows: error || !data ? [] : normalizeCreditBalances(data) });
+      });
+    return () => { cancelled = true; };
+  }, [code, indicators.credit, creditRows?.code]);
+
+  // 봉 날짜에 맞춘 패널 점. 꺼져 있으면 undefined → CandleChart의 고정 빈 배열(차트 재생성 방지)
+  const shortPoints = useMemo(
+    () => indicators.short && shortRows?.code === code
+      ? alignShortSales(shortRows.rows, candles, candleType)
+      : undefined,
+    [indicators.short, shortRows, code, candles, candleType],
+  );
+  const creditPoints = useMemo(
+    () => indicators.credit && creditRows?.code === code
+      ? alignCreditBalances(creditRows.rows, candles, candleType)
+      : undefined,
+    [indicators.credit, creditRows, code, candles, candleType],
+  );
 
   // ── 메모 핸들러 ───────────────────────────────────────────────────────────────
   const handleDateClick = useCallback((date: string) => {
@@ -458,7 +514,7 @@ export default function StockChartSection({ code }: Props) {
               {/* 서브 패널 지표 */}
               <div className="flex flex-wrap items-center gap-2">
                 <span className="w-12 text-xs font-medium text-muted-foreground">하단지표</span>
-                <div className="flex gap-1">
+                <div className="flex flex-wrap gap-1">
                   <ToggleBtn active={indicators.volume} onClick={() => toggleFlag('volume')}>
                     VOL
                   </ToggleBtn>
@@ -467,6 +523,12 @@ export default function StockChartSection({ code }: Props) {
                   </ToggleBtn>
                   <ToggleBtn active={indicators.obv} onClick={() => toggleFlag('obv')} accentColor="#34d399">
                     OBV
+                  </ToggleBtn>
+                  <ToggleBtn active={indicators.short} onClick={() => toggleFlag('short')} accentColor="#f59e0b">
+                    공매도
+                  </ToggleBtn>
+                  <ToggleBtn active={indicators.credit} onClick={() => toggleFlag('credit')} accentColor="#f472b6">
+                    신용
                   </ToggleBtn>
                 </div>
               </div>
@@ -485,6 +547,8 @@ export default function StockChartSection({ code }: Props) {
             memos={memosMap}
             onDateClick={handleDateClick}
             topInfoRef={topInfoRef}
+            shortSales={shortPoints}
+            credit={creditPoints}
           />
         ) : (
           <div className="flex h-[400px] items-center justify-center text-muted-foreground">
